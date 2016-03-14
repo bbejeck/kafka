@@ -163,8 +163,12 @@ public interface KStream<K, V> {
      * @param processorSupplier the supplier of the Processor to use
      * @param stateStoreNames the names of the state store used by the processor
      */
-    void process(ProcessorSupplier<K, V> processorSupplier, String... stateStoreNames);
+     KStream<K,V> process(ProcessorSupplier<K, V> processorSupplier, String... stateStoreNames);
 
+
+    void processTo(String topic,  ProcessorSupplier<K,V> processorSupplier, String... stateStoreNames);
+
+    void processTo(String topic, ProcessorSupplier<K,V> processorSupplier,  Serializer<K> keySerializer, Serializer<V> valSerializer, String... stateStoreNames);
     /**
      * Combines values of this stream with another KStream using Windowed Inner Join.
      *

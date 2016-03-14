@@ -249,11 +249,34 @@ public class KStreamImpl<K, V> extends AbstractStream<K> implements KStream<K, V
     }
 
     @Override
-    public void process(final ProcessorSupplier<K, V> processorSupplier, String... stateStoreNames) {
+    public KStream<K,V> process(final ProcessorSupplier<K, V> processorSupplier, String... stateStoreNames) {
         String name = topology.newName(PROCESSOR_NAME);
 
         topology.addProcessor(name, processorSupplier, this.name);
         topology.connectProcessorAndStateStores(name, stateStoreNames);
+        return new KStreamImpl<>(topology,name,sourceNodes);
+    }
+
+    @Override
+    public void processTo(String topic, ProcessorSupplier<K, V> processorSupplier,  String... stateStoreNames) {
+        processTo(topic, processorSupplier, null, null, stateStoreNames);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public void processTo(String topic,ProcessorSupplier<K, V> processorSupplier,  Serializer<K> keySerializer, Serializer<V> valSerializer, String... stateStoreNames) {
+        String processorName = topology.newName(PROCESSOR_NAME);
+        String sinkName = topology.newName(SINK_NAME);
+        StreamPartitioner<K, V> streamPartitioner = null;
+
+        if (keySerializer != null && keySerializer instanceof WindowedSerializer) {
+            WindowedSerializer<Object> windowedSerializer = (WindowedSerializer<Object>) keySerializer;
+            streamPartitioner = (StreamPartitioner<K, V>) new WindowedStreamPartitioner<Object, V>(windowedSerializer);
+        }
+
+        topology.addProcessor(processorName, processorSupplier, this.name);
+        topology.addSink(sinkName,topic, keySerializer, valSerializer, streamPartitioner, processorName);
+        topology.connectProcessorAndStateStores(processorName, stateStoreNames);
     }
 
     @Override
