@@ -54,7 +54,7 @@ import java.util.Set;
 public class EosTestDriver extends SmokeTestUtil {
 
     private static final int MAX_NUMBER_OF_KEYS = 100;
-    private static final long MAX_IDLE_TIME_MS = 300000L;
+    private static final long MAX_IDLE_TIME_MS = 600000L;
 
     private static boolean isRunning = true;
 
@@ -190,7 +190,7 @@ public class EosTestDriver extends SmokeTestUtil {
             final long maxWaitTime = System.currentTimeMillis() + MAX_IDLE_TIME_MS;
             while (!adminClient.describeConsumerGroup(EosTestClient.APP_ID, 10000).consumers().get().isEmpty()) {
                 if (System.currentTimeMillis() > maxWaitTime) {
-                    throw new RuntimeException("Streams application not down after 30 seconds.");
+                    throw new RuntimeException("Streams application not down after 60 seconds.");
                 }
                 sleep(1000);
             }
@@ -266,7 +266,7 @@ public class EosTestDriver extends SmokeTestUtil {
         }
 
         if (!allRecordsReceived) {
-            throw new RuntimeException("FAIL: did not receive all records after 30 sec idle time.");
+            throw new RuntimeException("FAIL: did not receive all records after 60 sec idle time.");
         }
 
         return recordPerTopicPerPartition;
