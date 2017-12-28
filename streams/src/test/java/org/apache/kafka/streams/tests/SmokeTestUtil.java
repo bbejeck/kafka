@@ -59,7 +59,7 @@ public class SmokeTestUtil {
                             System.out.println(">>> " + context.offset());
                         }
                         numRecordsProcessed++;
-                        if (numRecordsProcessed % 100 == 0) {
+                        if (numRecordsProcessed % 500 == 0) {
                             System.out.println(System.currentTimeMillis());
                             System.out.println("processed " + numRecordsProcessed + " records from topic=" + topic);
                         }
