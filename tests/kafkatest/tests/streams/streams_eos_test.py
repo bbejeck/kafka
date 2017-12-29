@@ -115,20 +115,20 @@ class StreamsEosTest(KafkaTest):
 
         verifier.node.account.ssh("grep ALL-RECORDS-DELIVERED %s" % verifier.STDOUT_FILE, allow_fail=False)
 
-    def add_streams(self, processor):
+    def add_streams(self, processor, from_call=""):
         with processor.node.account.monitor_log(processor.STDOUT_FILE) as monitor:
             processor.start()
-            self.wait_for_startup(monitor, processor)
+            self.wait_for_startup(monitor, processor, from_call + " add_streams")
 
     def add_streams2(self, running_processor, processor_to_be_started):
         with running_processor.node.account.monitor_log(running_processor.STDOUT_FILE) as monitor:
-            self.add_streams(processor_to_be_started)
-            self.wait_for_startup(monitor, running_processor)
+            self.add_streams(processor_to_be_started, "add_streams_2")
+            self.wait_for_startup(monitor, running_processor, "add_streams_2")
 
     def add_streams3(self, running_processor1, running_processor2, processor_to_be_started):
         with running_processor1.node.account.monitor_log(running_processor1.STDOUT_FILE) as monitor:
             self.add_streams2(running_processor2, processor_to_be_started)
-            self.wait_for_startup(monitor, running_processor1)
+            self.wait_for_startup(monitor, running_processor1, "add_streams_3")
 
     def stop_streams(self, processor_to_be_stopped):
         with processor_to_be_stopped.node.account.monitor_log(processor_to_be_stopped.STDOUT_FILE) as monitor2:
@@ -138,26 +138,26 @@ class StreamsEosTest(KafkaTest):
     def stop_streams2(self, keep_alive_processor, processor_to_be_stopped):
         with keep_alive_processor.node.account.monitor_log(keep_alive_processor.STDOUT_FILE) as monitor:
             self.stop_streams(processor_to_be_stopped)
-            self.wait_for_startup(monitor, keep_alive_processor)
+            self.wait_for_startup(monitor, keep_alive_processor, "stop_streams2")
 
     def stop_streams3(self, keep_alive_processor1, keep_alive_processor2, processor_to_be_stopped):
         with keep_alive_processor1.node.account.monitor_log(keep_alive_processor1.STDOUT_FILE) as monitor:
             self.stop_streams2(keep_alive_processor2, processor_to_be_stopped)
-            self.wait_for_startup(monitor, keep_alive_processor1)
+            self.wait_for_startup(monitor, keep_alive_processor1, "stop_streams3")
 
     def abort_streams(self, keep_alive_processor1, keep_alive_processor2, processor_to_be_aborted):
         with keep_alive_processor1.node.account.monitor_log(keep_alive_processor1.STDOUT_FILE) as monitor1:
             with keep_alive_processor2.node.account.monitor_log(keep_alive_processor2.STDOUT_FILE) as monitor2:
                 processor_to_be_aborted.stop_nodes(False)
-            self.wait_for_startup(monitor2, keep_alive_processor2)
-        self.wait_for_startup(monitor1, keep_alive_processor1)
+            self.wait_for_startup(monitor2, keep_alive_processor2, "abort_streams")
+        self.wait_for_startup(monitor1, keep_alive_processor1, "abort_streams_outer")
 
-    def wait_for_startup(self, monitor, processor):
-        self.wait_for(monitor, processor, "StateChange: RUNNING -> REBALANCING")
-        self.wait_for(monitor, processor, "StateChange: REBALANCING -> RUNNING")
-        self.wait_for(monitor, processor, "processed 500 records from topic=data")
+    def wait_for_startup(self, monitor, processor, state):
+        self.wait_for(monitor, processor, "StateChange: RUNNING -> REBALANCING", state)
+        self.wait_for(monitor, processor, "StateChange: REBALANCING -> RUNNING", state)
+        self.wait_for(monitor, processor, "processed 500 records from topic=data", state)
 
-    def wait_for(self, monitor, processor, output):
+    def wait_for(self, monitor, processor, output, state):
         monitor.wait_until(output,
                            timeout_sec=300,
-                           err_msg=("Never saw output '%s' on " % output) + str(processor.node.account))
+                           err_msg=("Never saw output '%s' at state '%s' on" % (output, state)) + str(processor.node.account))
