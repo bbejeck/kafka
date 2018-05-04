@@ -43,7 +43,7 @@ class StatelessProcessorNode<K, V> extends StreamsGraphNode {
 
     StatelessProcessorNode(final String parentProcessorNodeName,
                            final String processorNodeName,
-                           final ProcessorSupplier<K, V> processorSupplier,
+                           final ProcessorSupplier processorSupplier,
                            final boolean repartitionRequired) {
 
         super(parentProcessorNodeName,
@@ -56,7 +56,7 @@ class StatelessProcessorNode<K, V> extends StreamsGraphNode {
     StatelessProcessorNode(final String parentProcessorNodeName,
                            final String processorNodeName,
                            final boolean repartitionRequired,
-                           final ProcessorSupplier<K, V> processorSupplier,
+                           final ProcessorSupplier processorSupplier,
                            final List<String> multipleParentNames) {
 
         this(parentProcessorNodeName, processorNodeName, processorSupplier, repartitionRequired);
