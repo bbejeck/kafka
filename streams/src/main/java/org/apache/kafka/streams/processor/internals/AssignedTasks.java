@@ -132,6 +132,7 @@ abstract class AssignedTasks<T extends Task> {
     }
 
     boolean allTasksRunning() {
+        log.info("in all tasks running created is " + created + " suspended is " + suspended + " restoring is " + restoring);
         return created.isEmpty()
                 && suspended.isEmpty()
                 && restoring.isEmpty();

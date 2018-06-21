@@ -316,9 +316,13 @@ class TaskManager {
         active.initializeNewTasks();
         standby.initializeNewTasks();
 
+        log.info("Calling restore for " + active);
         final Collection<TopicPartition> restored = changelogReader.restore(active);
+        log.info("Back from changelogReader restore for " + restored);
 
+        log.info("calling update restored with " + restored);
         active.updateRestored(restored);
+        log.info("back from updateRestored call");
 
         if (active.allTasksRunning()) {
             Set<TopicPartition> assignment = consumer.assignment();
