@@ -18,7 +18,7 @@ from ducktape.mark import parametrize
 from kafkatest.services.streams import StreamsSmokeTestDriverService, \
     StreamsUpgradeTestJobRunnerService
 from kafkatest.tests.kafka_test import KafkaTest
-from kafkatest.version import LATEST_0_10_0, LATEST_0_10_1, DEV_VERSION
+from kafkatest.version import LATEST_0_10_0, LATEST_0_10_1, LATEST_0_10_2, DEV_VERSION
 
 
 class StreamsUpgradeTest(KafkaTest):
@@ -75,6 +75,7 @@ class StreamsUpgradeTest(KafkaTest):
         self.driver.stop()
 
     @parametrize(new_version=str(LATEST_0_10_1))
+    @parametrize(new_version=str(LATEST_0_10_2))
     @parametrize(new_version=str(DEV_VERSION))
     def test_metadata_upgrade(self, new_version):
         """
