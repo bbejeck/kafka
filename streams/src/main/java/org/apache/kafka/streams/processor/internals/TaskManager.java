@@ -248,6 +248,7 @@ class TaskManager {
      */
     boolean updateNewAndRestoringTasks() {
         final Set<TopicPartition> resumed = active.initializeNewTasks();
+        log.debug("$$ updateNewAndRestoringTasks {} for {}", resumed, active);
         standby.initializeNewTasks();
 
         final Collection<TopicPartition> restored = changelogReader.restore(active);

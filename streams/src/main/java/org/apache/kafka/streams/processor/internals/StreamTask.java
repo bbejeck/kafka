@@ -155,7 +155,7 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
 
     @Override
     public boolean initializeStateStores() {
-        log.trace("Initializing state stores");
+        log.debug("Initializing state stores for {}", id);
         registerStateStores();
         return changelogPartitions().isEmpty();
     }
@@ -168,6 +168,7 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
      */
     @Override
     public void initializeTopology() {
+        log.debug("$$ Initialize topology called for {} calling initTopology next", id);
         initTopology();
 
         if (eosEnabled) {
@@ -381,7 +382,7 @@ public class StreamTask extends AbstractTask implements ProcessorNodePunctuator 
 
     private void initTopology() {
         // initialize the task by initializing all its processor nodes in the topology
-        log.trace("Initializing processor nodes of the topology");
+        log.debug("Initializing processor nodes of the topology for {}", id);
         for (final ProcessorNode node : topology.processors()) {
             processorContext.setCurrentNode(node);
             try {

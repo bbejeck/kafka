@@ -130,7 +130,7 @@ class AssignedTasks implements RestoringTasks {
                 it.remove();
             } catch (final LockException e) {
                 // made this trace as it will spam the logs in the poll loop.
-                log.trace("Could not create {} {} due to {}; will retry", taskTypeName, entry.getKey(), e.getMessage());
+                log.debug("Could not create {} {} due to {}; will retry", taskTypeName, entry.getKey(), e.getMessage());
             }
         }
         return readyPartitions;
@@ -280,6 +280,7 @@ class AssignedTasks implements RestoringTasks {
     }
 
     private void addToRestoring(final StreamTask task) {
+        log.debug("$$ Adding {} {} to restoring", task.id, taskTypeName);
         restoring.put(task.id(), task);
         for (TopicPartition topicPartition : task.partitions()) {
             restoringByPartition.put(topicPartition, task);
