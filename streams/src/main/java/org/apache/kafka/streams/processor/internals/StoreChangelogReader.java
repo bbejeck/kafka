@@ -186,6 +186,7 @@ public class StoreChangelogReader implements ChangelogReader {
                 // `task.reinitializeStateStoresForPartitions()` that calls `register()` internally again
                 log.debug("$$ removing {} from needsInitializing", restoringPartition);
                 needsInitializing.remove(restoringPartition);
+                initialized.remove(restoringPartition);
                 restorer.setCheckpointOffset(consumer.position(restoringPartition));
 
                 task.reinitializeStateStoresForPartitions(restoringPartition);
