@@ -248,15 +248,17 @@ class TaskManager {
      */
     boolean updateNewAndRestoringTasks() {
         final Set<TopicPartition> resumed = active.initializeNewTasks();
-        log.debug("$$ updateNewAndRestoringTasks {} for {}", resumed, active);
+        log.debug("$$ updateNewAndRestoringTasks resumed {} for {}", resumed, active.allAssignedTaskIds());
         standby.initializeNewTasks();
 
         final Collection<TopicPartition> restored = changelogReader.restore(active);
 
+        log.debug("$$ updateNewAndRestoringTasks changelogReader.restore(active) returned {}", restored);
+
         resumed.addAll(active.updateRestored(restored));
 
         if (!resumed.isEmpty()) {
-            log.trace("resuming partitions {}", resumed);
+            log.debug("$$ resuming partitions {}", resumed);
             consumer.resume(resumed);
         }
         if (active.allTasksRunning()) {

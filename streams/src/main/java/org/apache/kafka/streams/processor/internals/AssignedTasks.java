@@ -140,7 +140,7 @@ class AssignedTasks implements RestoringTasks {
         if (restored.isEmpty()) {
             return Collections.emptySet();
         }
-        log.trace("{} changelog partitions that have completed restoring so far: {}", taskTypeName, restored);
+        log.debug("$$ {} changelog partitions that have completed restoring so far: {}", taskTypeName, restored);
         final Set<TopicPartition> resume = new HashSet<>();
         restoredPartitions.addAll(restored);
         for (final Iterator<Map.Entry<TaskId, Task>> it = restoring.entrySet().iterator(); it.hasNext(); ) {
@@ -149,7 +149,7 @@ class AssignedTasks implements RestoringTasks {
             if (restoredPartitions.containsAll(task.changelogPartitions())) {
                 transitionToRunning(task, resume);
                 it.remove();
-                log.trace("{} {} completed restoration as all its changelog partitions {} have been applied to restore state",
+                log.debug("$$ {} {} completed restoration as all its changelog partitions {} have been applied to restore state",
                         taskTypeName,
                         task.id(),
                         task.changelogPartitions());
@@ -157,7 +157,7 @@ class AssignedTasks implements RestoringTasks {
                 if (log.isTraceEnabled()) {
                     final HashSet<TopicPartition> outstandingPartitions = new HashSet<>(task.changelogPartitions());
                     outstandingPartitions.removeAll(restoredPartitions);
-                    log.trace("{} {} cannot resume processing yet since some of its changelog partitions have not completed restoring: {}",
+                    log.debug("$$ {} {} cannot resume processing yet since some of its changelog partitions have not completed restoring: {}",
                               taskTypeName,
                               task.id(),
                               outstandingPartitions);
@@ -182,11 +182,11 @@ class AssignedTasks implements RestoringTasks {
 
     RuntimeException suspend() {
         final AtomicReference<RuntimeException> firstException = new AtomicReference<>(null);
-        log.trace("Suspending running {} {}", taskTypeName, runningTaskIds());
+        log.debug("$$ Suspending running {} {}", taskTypeName, runningTaskIds());
         firstException.compareAndSet(null, suspendTasks(running.values()));
-        log.trace("Close restoring {} {}", taskTypeName, restoring.keySet());
+        log.debug("$$ Close restoring {} {}", taskTypeName, restoring.keySet());
         firstException.compareAndSet(null, closeNonRunningTasks(restoring.values()));
-        log.trace("Close created {} {}", taskTypeName, created.keySet());
+        log.debug("$$ Close created {} {}", taskTypeName, created.keySet());
         firstException.compareAndSet(null, closeNonRunningTasks(created.values()));
         previousActiveTasks.clear();
         previousActiveTasks.addAll(running.keySet());

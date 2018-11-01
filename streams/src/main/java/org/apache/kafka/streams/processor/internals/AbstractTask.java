@@ -170,6 +170,7 @@ public abstract class AbstractTask implements Task {
     }
 
     protected void updateOffsetLimits() {
+        log.debug("$$ in updateOffsetLimits for id {}", id);
         for (final TopicPartition partition : partitions) {
             try {
                 final OffsetAndMetadata metadata = consumer.committed(partition); // TODO: batch API?
@@ -216,13 +217,13 @@ public abstract class AbstractTask implements Task {
             throw new StreamsException(String.format("%sFatal error while trying to lock the state directory for task %s",
                                                      logPrefix, id));
         }
-        log.debug("Initializing state stores for {}", id);
+        log.debug("Registering state stores for {}", id);
 
         // set initial offset limits
         updateOffsetLimits();
 
         for (final StateStore store : topology.stateStores()) {
-            log.debug("Initializing store {} and task {}", store.name(), id);
+            log.debug("Registering store {} and task {}", store.name(), id);
             store.init(processorContext, store);
         }
     }

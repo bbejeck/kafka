@@ -797,6 +797,7 @@ public class StreamThread extends Thread implements ThreadDataProvider {
             // to unblock the restoration as soon as possible
             records = pollRequests(0L);
 
+
             if (taskManager.updateNewAndRestoringTasks()) {
                 setState(State.RUNNING);
             }
