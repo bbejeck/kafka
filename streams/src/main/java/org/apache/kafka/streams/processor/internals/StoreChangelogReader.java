@@ -189,7 +189,6 @@ public class StoreChangelogReader implements ChangelogReader {
                 restorer.setCheckpointOffset(consumer.position(restoringPartition));
 
                 task.reinitializeStateStoresForPartitions(restoringPartition);
-                stateRestorers.get(restoringPartition).restoreStarted();
             } else {
                 log.info("Restoring task {}'s state store {} from beginning of the changelog {} ", task.id, restorer.storeName(), restoringPartition);
 
