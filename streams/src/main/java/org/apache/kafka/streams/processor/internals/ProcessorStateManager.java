@@ -185,11 +185,15 @@ public class ProcessorStateManager implements StateManager {
     void reinitializeStateStoresForPartitions(final TopicPartition topicPartition,
                                               final InternalProcessorContext processorContext) {
         final Map<String, String> changelogTopicToStore = inverseOneToOneMap(storeToChangelogTopic);
+        log.debug("$$ inverting storeToChangeLogTopic from  {} to {}", storeToChangelogTopic, changelogTopicToStore);
         final Set<String> storeToBeReinitialized = new HashSet<>();
         final Map<String, StateStore> storesCopy = new HashMap<>(stores);
 
         checkpointedOffsets.remove(topicPartition);
         storeToBeReinitialized.add(changelogTopicToStore.get(topicPartition.topic()));
+
+
+        log.debug("$$ storeToBeReinitialized contains {}",storeToBeReinitialized);
 
         if (!eosEnabled) {
             try {
@@ -203,8 +207,10 @@ public class ProcessorStateManager implements StateManager {
         for (final Map.Entry<String, StateStore> entry : storesCopy.entrySet()) {
             final StateStore stateStore = entry.getValue();
             final String storeName = stateStore.name();
+            log.debug("$$ Working with store name {}", storeName);
             if (storeToBeReinitialized.contains(storeName)) {
                 try {
+                    log.debug("$$ Closing sate store {}", storeName);
                     stateStore.close();
                 } catch (final RuntimeException ignoreAndSwallow) { /* ignore */ }
                 processorContext.uninitialize();
@@ -224,6 +230,7 @@ public class ProcessorStateManager implements StateManager {
                     throw new StreamsException(String.format("Failed to reinitialize store %s.", storeName), fatalException);
                 }
 
+                log.debug("$$ deleted {} now calling init on it again", storeName);
                 stateStore.init(processorContext, stateStore);
             }
         }
