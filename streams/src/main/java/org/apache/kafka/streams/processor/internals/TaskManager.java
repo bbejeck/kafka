@@ -263,8 +263,10 @@ class TaskManager {
         }
         if (active.allTasksRunning()) {
             assignStandbyPartitions();
+            log.debug("$$ updateNewAndRestoringTasks All tasks running now");
             return true;
         }
+        log.debug("$$ updateNewAndRestoringTasks Not all running now");
         return false;
     }
 

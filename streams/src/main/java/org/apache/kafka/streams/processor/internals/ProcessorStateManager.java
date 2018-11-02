@@ -126,7 +126,7 @@ public class ProcessorStateManager implements StateManager {
     @Override
     public void register(final StateStore store,
                          final StateRestoreCallback stateRestoreCallback) {
-        log.debug("Registering state store {} to its state manager", store.name());
+        log.debug("$$ Registering state store {} to its state manager", store.name());
 
         if (store.name().equals(CHECKPOINT_FILE_NAME)) {
             throw new IllegalArgumentException(String.format("%sIllegal store name: %s", logPrefix, CHECKPOINT_FILE_NAME));
@@ -146,10 +146,10 @@ public class ProcessorStateManager implements StateManager {
         final TopicPartition storePartition = new TopicPartition(topic, getPartition(topic));
 
         if (isStandby) {
-            log.trace("Preparing standby replica of  state store {} with changelog topic {}", store.name(), topic);
+            log.debug("$$ register - Preparing standby replica of  state store {} with changelog topic {}", store.name(), topic);
             restoreCallbacks.put(topic, stateRestoreCallback);
         } else {
-            log.trace("Restoring state store {} from changelog topic {}", store.name(), topic);
+            log.debug("$$ register - Restoring state store {} from changelog topic {}", store.name(), topic);
             final StateRestorer restorer = new StateRestorer(storePartition,
                                                              new CompositeRestoreListener(stateRestoreCallback),
                                                              checkpointedOffsets.get(storePartition),
@@ -159,6 +159,7 @@ public class ProcessorStateManager implements StateManager {
 
             changelogReader.register(restorer);
         }
+        log.debug("$$ ProcessorStateManager.register adding storePartition {} to changelogPartitions {}", storePartition, changelogPartitions);
         changelogPartitions.add(storePartition);
 
         stores.put(store.name(), store);
@@ -185,7 +186,7 @@ public class ProcessorStateManager implements StateManager {
     void reinitializeStateStoresForPartitions(final TopicPartition topicPartition,
                                               final InternalProcessorContext processorContext) {
         final Map<String, String> changelogTopicToStore = inverseOneToOneMap(storeToChangelogTopic);
-        log.debug("$$ inverting storeToChangeLogTopic from  {} to {}", storeToChangelogTopic, changelogTopicToStore);
+        log.debug("$$ reinitializeStateStoresForPartitions - inverting storeToChangeLogTopic from  {} to {}", storeToChangelogTopic, changelogTopicToStore);
         final Set<String> storeToBeReinitialized = new HashSet<>();
         final Map<String, StateStore> storesCopy = new HashMap<>(stores);
 
@@ -193,7 +194,7 @@ public class ProcessorStateManager implements StateManager {
         storeToBeReinitialized.add(changelogTopicToStore.get(topicPartition.topic()));
 
 
-        log.debug("$$ storeToBeReinitialized contains {}",storeToBeReinitialized);
+        log.debug("$$ reinitializeStateStoresForPartitions storeToBeReinitialized contains {}",storeToBeReinitialized);
 
         if (!eosEnabled) {
             try {
@@ -207,16 +208,17 @@ public class ProcessorStateManager implements StateManager {
         for (final Map.Entry<String, StateStore> entry : storesCopy.entrySet()) {
             final StateStore stateStore = entry.getValue();
             final String storeName = stateStore.name();
-            log.debug("$$ Working with store name {}", storeName);
+            log.debug("$$ reinitializeStateStoresForPartitions Working with store name {}", storeName);
             if (storeToBeReinitialized.contains(storeName)) {
                 try {
-                    log.debug("$$ Closing sate store {}", storeName);
+                    log.debug("$$ reinitializeStateStoresForPartitions Closing sate store {}", storeName);
                     stateStore.close();
                 } catch (final RuntimeException ignoreAndSwallow) { /* ignore */ }
                 processorContext.uninitialize();
                 stores.remove(entry.getKey());
 
                 try {
+                    log.debug("$$ reinitializeStateStoresForPartitions delete #1");
                     Utils.delete(new File(baseDir + File.separator + "rocksdb" + File.separator + storeName));
                 } catch (final IOException fatalException) {
                     log.error("Failed to reinitialize store {}.", storeName, fatalException);
@@ -224,13 +226,14 @@ public class ProcessorStateManager implements StateManager {
                 }
 
                 try {
+                    log.debug("$$ reinitializeStateStoresForPartitions delete #1");
                     Utils.delete(new File(baseDir + File.separator + storeName));
                 } catch (final IOException fatalException) {
                     log.error("Failed to reinitialize store {}.", storeName, fatalException);
                     throw new StreamsException(String.format("Failed to reinitialize store %s.", storeName), fatalException);
                 }
 
-                log.debug("$$ deleted {} now calling init on it again", storeName);
+                log.debug("$$ reinitializeStateStoresForPartitions deleted {} now calling init on it again", storeName);
                 stateStore.init(processorContext, stateStore);
             }
         }

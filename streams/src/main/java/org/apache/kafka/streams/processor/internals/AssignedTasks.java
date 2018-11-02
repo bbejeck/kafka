@@ -154,7 +154,7 @@ class AssignedTasks implements RestoringTasks {
                         task.id(),
                         task.changelogPartitions());
             } else {
-                if (log.isTraceEnabled()) {
+                if (log.isDebugEnabled()) {
                     final HashSet<TopicPartition> outstandingPartitions = new HashSet<>(task.changelogPartitions());
                     outstandingPartitions.removeAll(restoredPartitions);
                     log.debug("$$ {} {} cannot resume processing yet since some of its changelog partitions have not completed restoring: {}",
