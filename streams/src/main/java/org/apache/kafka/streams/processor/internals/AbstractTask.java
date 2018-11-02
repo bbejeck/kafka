@@ -229,6 +229,7 @@ public abstract class AbstractTask implements Task {
     }
 
     void reinitializeStateStoresForPartitions(final TopicPartition partitions) {
+        log.debug("$$ reinitializeStateStoresForPartitions called for {}", partitions);
         stateMgr.reinitializeStateStoresForPartitions(partitions, processorContext);
     }
 
