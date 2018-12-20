@@ -41,7 +41,6 @@ import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
-import org.rocksdb.TableFormatConfig;
 import org.rocksdb.WriteBatch;
 import org.rocksdb.WriteOptions;
 
@@ -106,13 +105,6 @@ public class RocksDBStore implements KeyValueStore<Bytes, byte[]> {
         this.parentDir = parentDir;
     }
 
-    protected TableFormatConfig getTableConfig() {
-        final BlockBasedTableConfig tableConfig = new BlockBasedTableConfig();
-        tableConfig.setBlockCacheSize(BLOCK_CACHE_SIZE);
-        tableConfig.setBlockSize(BLOCK_SIZE);
-        tableConfig.setFilter(new BloomFilter());
-        return tableConfig;
-    }
 
     @SuppressWarnings("unchecked")
     public void openDB(final ProcessorContext context) {
@@ -120,7 +112,12 @@ public class RocksDBStore implements KeyValueStore<Bytes, byte[]> {
 
         options = new Options();
 
-        options.setTableFormatConfig(getTableConfig());
+        final BlockBasedTableConfig tableConfig = new BlockBasedTableConfig();
+        tableConfig.setBlockCacheSize(BLOCK_CACHE_SIZE);
+        tableConfig.setBlockSize(BLOCK_SIZE);
+        tableConfig.setFilter(new BloomFilter());
+
+        options.setTableFormatConfig(tableConfig);
         options.setWriteBufferSize(WRITE_BUFFER_SIZE);
         options.setCompressionType(COMPRESSION_TYPE);
         options.setCompactionStyle(COMPACTION_STYLE);
