@@ -79,7 +79,7 @@ public class BrokerCompatibilityTest {
         streamsProperties.put(StreamsConfig.consumerPrefix(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG), timeout);
         streamsProperties.put(StreamsConfig.consumerPrefix(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG), timeout);
         streamsProperties.put(StreamsConfig.REQUEST_TIMEOUT_MS_CONFIG, timeout + 1);
-        streamsProperties.put(StreamsConfig.adminClientPrefix(AdminClientConfig.RETRIES_CONFIG), 100);
+        streamsProperties.put(StreamsConfig.adminClientPrefix(AdminClientConfig.RETRIES_CONFIG), 25);
         final Serde<String> stringSerde = Serdes.String();
 
 
