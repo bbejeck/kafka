@@ -95,7 +95,7 @@ public class StreamsNamedRepartitionTest {
         final KafkaStreams streams = new KafkaStreams(topology, config);
 
 
-        streams.setStateListener((oldState, newState) -> {
+        streams.setStateListener((newState, oldState) -> {
             if (oldState == State.REBALANCING && newState == State.RUNNING) {
                 if (addOperators) {
                     System.out.println("UPDATED Topology");
