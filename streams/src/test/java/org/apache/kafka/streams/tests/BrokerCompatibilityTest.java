@@ -16,6 +16,7 @@
  */
 package org.apache.kafka.streams.tests;
 
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -34,7 +35,6 @@ import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.errors.StreamsException;
 import org.apache.kafka.streams.kstream.Grouped;
-import org.apache.kafka.streams.kstream.ValueMapper;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -79,6 +79,7 @@ public class BrokerCompatibilityTest {
         streamsProperties.put(StreamsConfig.consumerPrefix(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG), timeout);
         streamsProperties.put(StreamsConfig.consumerPrefix(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG), timeout);
         streamsProperties.put(StreamsConfig.REQUEST_TIMEOUT_MS_CONFIG, timeout + 1);
+        streamsProperties.put(StreamsConfig.adminClientPrefix(AdminClientConfig.RETRIES_CONFIG), 100);
         final Serde<String> stringSerde = Serdes.String();
 
 
@@ -86,29 +87,21 @@ public class BrokerCompatibilityTest {
         builder.<String, String>stream(SOURCE_TOPIC).groupByKey(Grouped.with(stringSerde, stringSerde))
             .count()
             .toStream()
-            .mapValues(new ValueMapper<Long, String>() {
-                @Override
-                public String apply(final Long value) {
-                    return value.toString();
-                }
-            })
+            .mapValues(value -> value.toString())
             .to(SINK_TOPIC);
 
         final KafkaStreams streams = new KafkaStreams(builder.build(), streamsProperties);
-        streams.setUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
-            @Override
-            public void uncaughtException(final Thread t, final Throwable e) {
-                Throwable cause = e;
-                if (cause instanceof StreamsException) {
-                    while (cause.getCause() != null) {
-                        cause = cause.getCause();
-                    }
+        streams.setUncaughtExceptionHandler((t, e) -> {
+            Throwable cause = e;
+            if (cause instanceof StreamsException) {
+                while (cause.getCause() != null) {
+                    cause = cause.getCause();
                 }
-                System.err.println("FATAL: An unexpected exception " + cause);
-                e.printStackTrace(System.err);
-                System.err.flush();
-                streams.close(Duration.ofSeconds(30));
             }
+            System.err.println("FATAL: An unexpected exception " + cause);
+            e.printStackTrace(System.err);
+            System.err.flush();
+            streams.close(Duration.ofSeconds(30));
         });
         System.out.println("start Kafka Streams");
         streams.start();
