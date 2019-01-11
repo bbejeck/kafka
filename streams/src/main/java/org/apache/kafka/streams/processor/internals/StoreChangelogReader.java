@@ -68,29 +68,25 @@ public class StoreChangelogReader implements ChangelogReader {
             restorer.setUserRestoreListener(userStateRestoreListener);
             stateRestorers.put(restorer.partition(), restorer);
 
-            log.debug("Added restorer for changelog {}", restorer.partition());
+            log.trace("Added restorer for changelog {}", restorer.partition());
         }
 
         needsInitializing.add(restorer.partition());
     }
 
     public Collection<TopicPartition> restore(final RestoringTasks active) {
-        log.debug("In restore with {}", active);
-        log.debug("Current state in start restore needsInitializing={}, needsRestoring={}, completedRestorers={}, stateRestorer={}", needsInitializing, needsRestoring, completedRestorers, stateRestorers);
         if (!needsInitializing.isEmpty()) {
-            log.debug("Needs initializing {}", active);
             initialize(active);
         }
-        log.debug("StateRestorers at start of restore {}", stateRestorers);
+
         if (needsRestoring.isEmpty()) {
-            log.debug("needs restoring is empty so calling restoreConsumer#unsubscribe");
             restoreConsumer.unsubscribe();
             return completed();
         }
 
         try {
             final ConsumerRecords<byte[], byte[]> records = restoreConsumer.poll(pollTime);
-            log.debug("Starting restore consumer consume completedRestorers {}", completedRestorers );
+
             for (final TopicPartition partition : needsRestoring) {
                 final StateRestorer restorer = stateRestorers.get(partition);
                 final long pos = processNext(records.records(partition), restorer, endOffsets.get(partition));
@@ -100,9 +96,7 @@ public class StoreChangelogReader implements ChangelogReader {
                     endOffsets.remove(partition);
                     completedRestorers.add(partition);
                 }
-                log.debug("Completed restorers now {}", completedRestorers);
             }
-            log.debug("Current state after iterating over needsRestoring needsInitializing={}, needsRestoring={}, completedRestorers={}, stateRestorer={}", needsInitializing, needsRestoring, completedRestorers, stateRestorers);
         } catch (final InvalidOffsetException recoverableException) {
             log.warn("Restoring StreamTasks failed. Deleting StreamTasks stores to recreate from scratch.", recoverableException);
             final Set<TopicPartition> partitions = recoverableException.partitions();
@@ -117,15 +111,12 @@ public class StoreChangelogReader implements ChangelogReader {
                 restorer.setCheckpointOffset(StateRestorer.NO_CHECKPOINT);
                 task.reinitializeStateStoresForPartitions(recoverableException.partitions());
             }
-            log.debug("Current state in InvalidOffsetException needsInitializing={}, needsRestoring={}, completedRestorers={}, stateRestorer={}", needsInitializing, needsRestoring, completedRestorers, stateRestorers);
             restoreConsumer.seekToBeginning(partitions);
         }
 
-        log.debug("Before removing Completed restorers {} needsRestoring={}", completedRestorers, needsRestoring);
         needsRestoring.removeAll(completedRestorers);
 
         if (needsRestoring.isEmpty()) {
-            log.debug("needs restoring is empty so calling restoreConsumer unsubscribe");
             restoreConsumer.unsubscribe();
         }
 
