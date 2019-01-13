@@ -284,7 +284,7 @@ public class SmokeTestDriver extends SmokeTestUtil {
         }
         int retry = 0;
         final long start = System.currentTimeMillis();
-        while (System.currentTimeMillis() - start < TimeUnit.MINUTES.toMillis(6)) {
+        while (System.currentTimeMillis() - start < TimeUnit.MINUTES.toMillis(10)) {
             final ConsumerRecords<byte[], byte[]> records = consumer.poll(Duration.ofMillis(500));
             if (records.isEmpty() && recordsProcessed >= recordsGenerated) {
                 if (verifyMin(min, allData, false)

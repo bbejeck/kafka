@@ -173,13 +173,13 @@ class StreamsUpgradeTest(Test):
                                               timeout_sec=60,
                                               err_msg="Never saw output '%s' on" % self.processed_msg + str(processor.node.account))
 
-            # SmokeTestDriver allows up to 6 minutes to consume all
+            # SmokeTestDriver allows up to 10 minutes to consume all
             # records for the verification step so this timeout is set to
-            # 6 minutes (360 seconds) for consuming of verification records
+            # 10 minutes (600 seconds) for consuming of verification records
             # and a very conservative additional 2 minutes (120 seconds) to process
             # the records in the verification step
             driver_monitor.wait_until('ALL-RECORDS-DELIVERED\|PROCESSED-MORE-THAN-GENERATED',
-                                      timeout_sec=480,
+                                      timeout_sec=720,
                                       err_msg="Never saw output '%s' on" % 'ALL-RECORDS-DELIVERED|PROCESSED-MORE-THAN-GENERATED' + str(self.driver.node.account))
 
         self.driver.stop()
