@@ -32,7 +32,6 @@ import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.RocksDBConfigSetter;
 import org.rocksdb.BlockBasedTableConfig;
-import org.rocksdb.BloomFilter;
 import org.rocksdb.CompactionStyle;
 import org.rocksdb.CompressionType;
 import org.rocksdb.FlushOptions;
@@ -120,9 +119,7 @@ public class RocksDBStore implements KeyValueStore<Bytes, byte[]> {
         final BlockBasedTableConfig tableConfig = new BlockBasedTableConfig();
         tableConfig.setBlockCacheSize(BLOCK_CACHE_SIZE);
         tableConfig.setBlockSize(BLOCK_SIZE);
-        tableConfig.setFilter(new BloomFilter());
 
-        options.optimizeFiltersForHits();
         options.setTableFormatConfig(tableConfig);
         options.setWriteBufferSize(WRITE_BUFFER_SIZE);
         options.setCompressionType(COMPRESSION_TYPE);
