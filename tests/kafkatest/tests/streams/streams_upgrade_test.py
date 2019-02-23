@@ -90,10 +90,12 @@ class StreamsUpgradeTest(Test):
     processed_msg = "processed [0-9]* records"
 
     def perform_broker_upgrade(self, to_version):
-        self.logger.info("First pass bounce - rolling broker upgrade")
+        self.logger.info("First pass bounce - stop all brokers upgrade versions then upgrade")
         for node in self.kafka.nodes:
             self.kafka.stop_node(node)
             node.version = KafkaVersion(to_version)
+
+        for node in self.kafka.nodes:
             self.kafka.start_node(node)
 
     @cluster(num_nodes=6)
