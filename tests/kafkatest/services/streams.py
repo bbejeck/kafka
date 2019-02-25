@@ -328,9 +328,22 @@ class StreamsSmokeTestDriverService(StreamsSmokeTestBaseService):
     def __init__(self, test_context, kafka):
         super(StreamsSmokeTestDriverService, self).__init__(test_context, kafka, "run")
         self.DISABLE_AUTO_TERMINATE = ""
+        self.METADATA_MAX_AGE_CONFIG = 5 * 60 * 1000
+
+    def set_metadata_max_age(self, max_age):
+        self.METADATA_MAX_AGE_CONFIG = max_age
 
     def disable_auto_terminate(self):
         self.DISABLE_AUTO_TERMINATE = "disableAutoTerminate"
+
+    def prop_file(self):
+        properties = {streams_property.STATE_DIR: self.PERSISTENT_ROOT,
+                      streams_property.KAFKA_SERVERS: self.kafka.bootstrap_servers()}
+
+        properties["metadata.max.age.ms"] = self.METADATA_MAX_AGE_CONFIG
+
+        cfg = KafkaConfig(**properties)
+        return cfg.render()
 
     def start_cmd(self, node):
         args = self.args.copy()
@@ -349,9 +362,24 @@ class StreamsSmokeTestDriverService(StreamsSmokeTestBaseService):
 
         return cmd
 
+
 class StreamsSmokeTestJobRunnerService(StreamsSmokeTestBaseService):
     def __init__(self, test_context, kafka):
         super(StreamsSmokeTestJobRunnerService, self).__init__(test_context, kafka, "process")
+        self.METADATA_MAX_AGE_CONFIG = 5 * 60 * 1000
+
+    def set_metadata_max_age(self, max_age):
+        self.METADATA_MAX_AGE_CONFIG = max_age
+
+    def prop_file(self):
+        properties = {streams_property.STATE_DIR: self.PERSISTENT_ROOT,
+                      streams_property.KAFKA_SERVERS: self.kafka.bootstrap_servers()}
+
+        properties["metadata.max.age.ms"] = self.METADATA_MAX_AGE_CONFIG
+
+        cfg = KafkaConfig(**properties)
+        return cfg.render()
+
 
 
 class StreamsEosTestDriverService(StreamsEosTestBaseService):

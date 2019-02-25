@@ -147,9 +147,13 @@ class StreamsUpgradeTest(Test):
                    timeout_sec=60,
                    err_msg="Broker did not create all topics in 60 seconds ")
 
+        metadata_max_age = 5 * 6 * 1000
+
         self.driver = StreamsSmokeTestDriverService(self.test_context, self.kafka)
+        self.driver.set_metadata_max_age(metadata_max_age)
 
         processor = StreamsSmokeTestJobRunnerService(self.test_context, self.kafka)
+        processor.set_metadata_max_age(metadata_max_age)
 
         with self.driver.node.account.monitor_log(self.driver.STDOUT_FILE) as driver_monitor:
             self.driver.start()
