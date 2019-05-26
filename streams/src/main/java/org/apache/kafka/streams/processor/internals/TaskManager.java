@@ -329,7 +329,7 @@ public class TaskManager {
 
         active.updateRestored(restored);
 
-        if (active.allTasksRunning()) {
+        if (active.allTasksRunning() && standby.allTasksRunning()) {
             final Set<TopicPartition> assignment = consumer.assignment();
             log.trace("Resuming partitions {}", assignment);
             consumer.resume(assignment);
