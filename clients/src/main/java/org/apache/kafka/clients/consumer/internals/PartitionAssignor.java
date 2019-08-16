@@ -77,6 +77,7 @@ public interface PartitionAssignor {
         onAssignment(assignment);
     }
 
+
     /**
      * Unique name for this assignor (e.g. "range" or "roundrobin" or "sticky")
      * @return non-null unique name
