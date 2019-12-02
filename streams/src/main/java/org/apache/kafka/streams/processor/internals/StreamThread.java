@@ -763,7 +763,12 @@ public class StreamThread extends Thread {
 
         if (records != null && !records.isEmpty()) {
             pollSensor.record(pollLatency, now);
-            addRecordsToTasks(records);
+            try {
+                addRecordsToTasks(records);
+            } catch (NullPointerException npe) {
+                log.error("Got NPE adding Records to tasks at state " + state +" with number records " + records.count());
+                throw npe;
+            }
         }
 
         // only try to initialize the assigned tasks

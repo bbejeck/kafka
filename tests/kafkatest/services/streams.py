@@ -438,6 +438,14 @@ class StreamsStandbyTaskService(StreamsTestBaseService):
                                                         configs)
 
 
+class StreamsTasksNotFoundService(StreamsTestBaseService):
+    def __init__(self, test_context, kafka):
+        super(StreamsTasksNotFoundService, self).__init__(test_context,
+                                                          kafka,
+                                                          "org.apache.kafka.streams.tests.StreamsTaskNotFoundOnRebalanceTest",
+                                                          "")
+
+
 class StreamsOptimizedUpgradeTestService(StreamsTestBaseService):
     def __init__(self, test_context, kafka):
         super(StreamsOptimizedUpgradeTestService, self).__init__(test_context,
