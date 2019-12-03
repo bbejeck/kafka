@@ -53,6 +53,7 @@ class StreamsTasksAvailableAfterRebalance(Test):
                                            1,
                                            self.kafka,
                                            self.streams_source_topic,
+                                           throughput=2000,
                                            repeating_keys=6,
                                            acks=1)
 
@@ -103,6 +104,7 @@ class StreamsTasksAvailableAfterRebalance(Test):
                                err_msg="Never saw processing of %s " % pattern + str(processor.node.account))
 
     def stop_and_verify(self, processor):
+        self.logger.info("Verifying %s stopped pattern in STDOUT_FILE" % self.shut_down_message)
         node = processor.node
         with node.account.monitor_log(processor.STDOUT_FILE) as monitor:
             processor.stop()

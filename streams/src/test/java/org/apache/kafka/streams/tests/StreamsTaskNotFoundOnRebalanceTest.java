@@ -21,11 +21,14 @@ import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.utils.Utils;
 import org.apache.kafka.streams.KafkaStreams;
+import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.ForeachAction;
+import org.apache.kafka.streams.kstream.Grouped;
 import org.apache.kafka.streams.kstream.KStream;
+import org.apache.kafka.streams.kstream.KeyValueMapper;
 import org.apache.kafka.streams.kstream.Materialized;
 import org.apache.kafka.streams.kstream.Produced;
 import org.apache.kafka.streams.kstream.ValueMapper;
@@ -35,6 +38,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Properties;
+import java.util.Random;
 import java.util.Set;
 
 public class StreamsTaskNotFoundOnRebalanceTest {
@@ -66,10 +70,10 @@ public class StreamsTaskNotFoundOnRebalanceTest {
 
         final Serde<String> stringSerde = Serdes.String();
         final ValueMapper<Long, String> countMapper = Object::toString;
+        final Random random = new Random();
 
         final KStream<String, String> inputStream = builder.stream("input", Consumed.with(stringSerde, stringSerde));
-        final int reportInterval = 2000;
-
+        final int reportInterval = 5000;
         inputStream.peek(
             new ForeachAction<String, String>() {
                 int recordCounter = 0;
@@ -99,22 +103,22 @@ public class StreamsTaskNotFoundOnRebalanceTest {
 
         streams.setStateListener((newState, oldState) -> {
             if (newState == KafkaStreams.State.RUNNING) {
-                System.out.println("Now in RUNNING state");
+                System.out.println("Now in RUNNING state " + Instant.now());
                     final Set<ThreadMetadata> threadMetadata = streams.localThreadsMetadata();
                     for (final ThreadMetadata threadMetadatum : threadMetadata) {
-                        System.out.println("ACTIVE_TASKS:" + threadMetadatum.activeTasks().size());
+                        System.out.println("ACTIVE_TASKS:" + threadMetadatum.activeTasks().size() + " "+ Instant.now());
                     }
             }
         });
 
-        System.out.println("Cleaning up Kafka Streams");
+        System.out.println("Cleaning up Kafka Streams " + Instant.now());
         streams.cleanUp();
-        System.out.println("Start Kafka Streams");
+        System.out.println("Start Kafka Streams " + Instant.now());
         streams.start();
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             shutdown(streams);
-            System.out.println("Shut down streams now");
+            System.out.println("Shut down streams now " + Instant.now());
         }));
     }
 
