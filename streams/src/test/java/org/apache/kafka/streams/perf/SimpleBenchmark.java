@@ -33,6 +33,7 @@ import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.utils.Utils;
 import org.apache.kafka.streams.KafkaStreams;
+import org.apache.kafka.streams.KafkaStreams.State;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.kstream.Consumed;
@@ -47,6 +48,7 @@ import org.apache.kafka.streams.processor.AbstractProcessor;
 import org.apache.kafka.streams.processor.Processor;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.ProcessorSupplier;
+import org.apache.kafka.streams.processor.StateRestoreListener;
 import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.StoreBuilder;
@@ -54,6 +56,7 @@ import org.apache.kafka.streams.state.Stores;
 import org.apache.kafka.streams.state.WindowStore;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -114,10 +117,12 @@ public class SimpleBenchmark {
     private static final long POLL_MS = 500L;
     private static final long COMMIT_INTERVAL_MS = 30000L;
     private static final int MAX_POLL_RECORDS = 1000;
+//    private static final int MAX_POLL_RECORDS = 2000;
+//    private static final int MAX_POLL_RECORDS = 4000;
 
     /* ----------- benchmark variables that are hard-coded ----------- */
 
-    private static final int KEY_SPACE_SIZE = 10000;
+    private static final int KEY_SPACE_SIZE = 50_000_000;
 
     private static final long STREAM_STREAM_JOIN_WINDOW = 10000L;
 
@@ -254,6 +259,7 @@ public class SimpleBenchmark {
         props.put(StreamsConfig.CLIENT_ID_CONFIG, "simple-benchmark");
         props.put(StreamsConfig.POLL_MS_CONFIG, POLL_MS);
         props.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, COMMIT_INTERVAL_MS);
+        props.put(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, 0);
         props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.Integer().getClass());
         props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.ByteArray().getClass());
         // the socket buffer needs to be large, especially when running in AWS with
@@ -317,7 +323,8 @@ public class SimpleBenchmark {
             new Random(System.currentTimeMillis()).nextBytes(value);
 
             for (int i = 0; i < numRecords; i++) {
-                producer.send(new ProducerRecord<>(topic, keyGen.next(), value));
+                //producer.send(new ProducerRecord<>(topic, keyGen.next(), value));
+                producer.send(new ProducerRecord<>(topic, i+1, value));
             }
         }
     }
@@ -460,7 +467,7 @@ public class SimpleBenchmark {
         }, "store");
 
         final KafkaStreams streams = createKafkaStreamsWithExceptionHandler(builder, props);
-        runGenericBenchmark(streams, "Streams Stateful Performance [records/latency/rec-sec/MB-sec joined]: ", latch);
+        runGenericBenchmark(streams, "Streams Stateful Performance [records/latency/rec-sec/MB-sec stream w/ store]: ", latch);
     }
 
     private void processStreamWithWindowStore(final String topic) {
@@ -635,6 +642,7 @@ public class SimpleBenchmark {
     }
 
     void runGenericBenchmark(final KafkaStreams streams, final String nameOfBenchmark, final CountDownLatch latch) {
+        streams.cleanUp();
         streams.start();
 
         final long startTime = System.currentTimeMillis();
@@ -681,6 +689,39 @@ public class SimpleBenchmark {
 
                 streamsClient.close(ofSeconds(30));
             }
+        });
+
+        streamsClient.setGlobalStateRestoreListener(new StateRestoreListener() {
+            int numBatches = 0;
+            long start = 0L;
+            long batchCount = 0L;
+            @Override
+            public void onRestoreStart(TopicPartition topicPartition, String storeName, long startingOffset, long endingOffset) {
+                System.out.println("restoring from " + startingOffset + " to " + endingOffset + " for " + storeName);
+                start = System.currentTimeMillis();
+            }
+
+            @Override
+            public void onBatchRestored(TopicPartition topicPartition, String storeName, long batchEndOffset, long numRestored) {
+               numBatches++;
+               batchCount += numRestored;
+            }
+
+            @Override
+            public void onRestoreEnd(TopicPartition topicPartition, String storeName, long totalRestored) {
+                System.out.println("Restored a total of " + totalRestored + " for storeName " + storeName);
+                System.out.println("Took "+ (System.currentTimeMillis() - start)/1000 + " seconds to restore with num batches " + numBatches);
+                System.out.println("Average batch size " + (double)batchCount/numBatches);
+            }
+        });
+
+        streamsClient.setStateListener((newState, oldState) -> {
+
+             if(newState == State.REBALANCING && oldState == State.CREATED ) {
+                 System.out.println("Starting at " + Instant.now());
+             } else if (newState == State.RUNNING) {
+                 System.out.println("Running at " + Instant.now());
+             }
         });
 
         return streamsClient;
