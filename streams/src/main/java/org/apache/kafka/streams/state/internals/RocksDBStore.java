@@ -66,6 +66,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.regex.Pattern;
 
 import static org.apache.kafka.streams.StreamsConfig.METRICS_RECORDING_LEVEL_CONFIG;
@@ -108,6 +110,7 @@ public class RocksDBStore implements KeyValueStore<Bytes, byte[]>, BulkLoadingSt
 
     private volatile boolean prepareForBulkload = false;
     ProcessorContext internalProcessorContext;
+    static ExecutorService executorService;
     // visible for testing
     volatile BatchingStateRestoreCallback batchingStateRestoreCallback = null;
 
@@ -141,6 +144,11 @@ public class RocksDBStore implements KeyValueStore<Bytes, byte[]>, BulkLoadingSt
 
         filter = new BloomFilter();
         tableConfig.setFilter(filter);
+
+        if (prepareForBulkload) {
+            userSpecifiedOptions.allowConcurrentMemtableWrite();
+            userSpecifiedOptions.enableWriteThreadAdaptiveYield();
+        }
 
         userSpecifiedOptions.optimizeFiltersForHits();
         userSpecifiedOptions.setTableFormatConfig(tableConfig);
@@ -396,6 +404,12 @@ public class RocksDBStore implements KeyValueStore<Bytes, byte[]>, BulkLoadingSt
             if (sstFileNames != null && sstFileNames.length > 0) {
                 dbAccessor.toggleDbForBulkLoading();
             }
+            executorService = Executors.newFixedThreadPool(2);
+        } else {
+            if (executorService != null) {
+                executorService.shutdownNow();
+                executorService = null;
+            }
         }
 
         close();
@@ -627,12 +641,14 @@ public class RocksDBStore implements KeyValueStore<Bytes, byte[]>, BulkLoadingSt
 
         @Override
         public void restoreAll(final Collection<KeyValue<byte[], byte[]>> records) {
-            try (final WriteBatch batch = new WriteBatch()) {
-                rocksDBStore.dbAccessor.prepareBatchForRestore(records, batch);
-                rocksDBStore.write(batch);
-            } catch (final RocksDBException e) {
-                throw new ProcessorStateException("Error restoring batch to store " + rocksDBStore.name, e);
-            }
+            executorService.submit(() -> {
+                try (final WriteBatch batch = new WriteBatch()) {
+                    rocksDBStore.dbAccessor.prepareBatchForRestore(records, batch);
+                    rocksDBStore.write(batch);
+                } catch (RocksDBException dbe) {
+                    throw new RuntimeException(dbe);
+                }
+            });
         }
 
         @Override
