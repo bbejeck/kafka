@@ -535,6 +535,8 @@ public interface KGroupedStream<K, V> {
      */
     SessionWindowedKStream<K, V> windowedBy(final SessionWindows windows);
 
+
+
     /**
      * Create a new {@link CogroupedKStream} from the this grouped KStream to allow cogrouping other
      * {@code KGroupedStream} to it.
