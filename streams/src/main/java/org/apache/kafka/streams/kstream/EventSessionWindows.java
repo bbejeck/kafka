@@ -70,17 +70,25 @@ import static org.apache.kafka.streams.kstream.internals.WindowingDefaults.DEFAU
  * @see KGroupedStream#windowedBy(EventSessionWindows)
  * @see TimestampExtractor
  */
-public final class EventSessionWindows {
+public final class EventSessionWindows<K , V> {
 
     private final long gapMs;
     private final long maintainDurationMs;
     private final long graceMs;
+    private final EventSessionStart<K, V> eventSessionStart;
+    private final EventSessionEnd<K, V> eventSessionEnd;
 
 
-    private EventSessionWindows(final long gapMs, final long maintainDurationMs, final long graceMs) {
+    private EventSessionWindows(final EventSessionStart<K, V> eventSessionStart,
+                                final EventSessionEnd<K, V> eventSessionEnd,
+                                long gapMs,
+                                final long maintainDurationMs,
+                                final long graceMs) {
         this.gapMs = gapMs;
         this.maintainDurationMs = maintainDurationMs;
         this.graceMs = graceMs;
+        this.eventSessionStart = eventSessionStart;
+        this.eventSessionEnd = eventSessionEnd;
     }
 
     /**
@@ -91,12 +99,17 @@ public final class EventSessionWindows {
      *
      * @throws IllegalArgumentException if {@code inactivityGap} is zero or negative or can't be represented as {@code long milliseconds}
      */
-    public static <T> EventSessionWindows with(final EventSessionStart<T> eventDataStart,
-                                               final EventSessionEnd<T> eventDataEnd,
-                                               final Duration maxInactivityGap) {
+    public static <K, V> EventSessionWindows<K, V> with(final EventSessionStart<K, V> eventDataStart,
+                                                 final EventSessionEnd<K, V> eventDataEnd,
+                                                 final Duration maxInactivityGap) {
         final String msgPrefix = prepareMillisCheckFailMsgPrefix(maxInactivityGap, "inactivityGap");
         final long inactivityGapLong = ApiUtils.validateMillisecondDuration(maxInactivityGap, msgPrefix);
-        return new EventSessionWindows(inactivityGapLong, DEFAULT_RETENTION_MS, -1);
+        return new EventSessionWindows<>(eventDataStart, eventDataEnd, inactivityGapLong, DEFAULT_RETENTION_MS, -1);
+    }
+
+    public static <K, V> EventSessionWindows<K, V> with(final EventSessionStart<K, V> eventDataStart,
+                                                  final EventSessionEnd<K, V> eventDataEnd) {
+        return new EventSessionWindows<>(eventDataStart, eventDataEnd, Long.MAX_VALUE, DEFAULT_RETENTION_MS, -1);
     }
 
     /**
@@ -111,12 +124,12 @@ public final class EventSessionWindows {
      *             {@link Materialized#as(SessionBytesStoreSupplier)}.
      */
     @Deprecated
-    public EventSessionWindows until(final long durationMs) throws IllegalArgumentException {
+    public EventSessionWindows<K, V> until(final long durationMs) throws IllegalArgumentException {
         if (durationMs < gapMs) {
             throw new IllegalArgumentException("Window retention time (durationMs) cannot be smaller than window gap.");
         }
 
-        return new EventSessionWindows(gapMs, durationMs, graceMs);
+        return new EventSessionWindows<>(eventSessionStart, eventSessionEnd, gapMs, durationMs, graceMs);
     }
 
     /**
@@ -131,7 +144,7 @@ public final class EventSessionWindows {
      * @return this updated builder
      * @throws IllegalArgumentException if the {@code afterWindowEnd} is negative of can't be represented as {@code long milliseconds}
      */
-    public EventSessionWindows grace(final Duration afterWindowEnd) throws IllegalArgumentException {
+    public EventSessionWindows<K, V> grace(final Duration afterWindowEnd) throws IllegalArgumentException {
         final String msgPrefix = prepareMillisCheckFailMsgPrefix(afterWindowEnd, "afterWindowEnd");
         final long afterWindowEndMs = ApiUtils.validateMillisecondDuration(afterWindowEnd, msgPrefix);
 
@@ -139,7 +152,9 @@ public final class EventSessionWindows {
             throw new IllegalArgumentException("Grace period must not be negative.");
         }
 
-        return new EventSessionWindows(
+        return new EventSessionWindows<>(
+                eventSessionStart,
+            eventSessionEnd,
             gapMs,
             maintainDurationMs,
             afterWindowEndMs
@@ -206,12 +221,12 @@ public final class EventSessionWindows {
     }
 
 
-    public interface EventSessionStart<T> {
-        boolean apply(T eventObject);
+    public interface EventSessionStart<K, V> {
+        boolean apply(K key, V value);
 
     }
 
-    public interface EventSessionEnd<T> {
-        boolean apply(T eventObject);
+    public interface EventSessionEnd<K, V> {
+        boolean apply(K key, V value);
     }
 }
