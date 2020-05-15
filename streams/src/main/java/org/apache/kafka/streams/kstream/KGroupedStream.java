@@ -22,6 +22,7 @@ import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StoreQueryParameters;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.Topology;
+import org.apache.kafka.streams.kstream.internals.EventSessionWindow;
 import org.apache.kafka.streams.state.KeyValueStore;
 
 /**
@@ -534,6 +535,8 @@ public interface KGroupedStream<K, V> {
      * @return an instance of {@link TimeWindowedKStream}
      */
     SessionWindowedKStream<K, V> windowedBy(final SessionWindows windows);
+
+    EventSessionWindowedKStream<K, V> windowedBy(final EventSessionWindows<K, V> windows);
 
 
 
