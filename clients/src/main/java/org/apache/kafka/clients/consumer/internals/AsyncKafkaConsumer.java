@@ -78,6 +78,7 @@ import org.apache.kafka.common.errors.InterruptException;
 import org.apache.kafka.common.errors.InvalidGroupIdException;
 import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.kafka.common.internals.ClusterResourceListeners;
+import org.apache.kafka.common.metrics.KafkaMetric;
 import org.apache.kafka.common.metrics.Metrics;
 import org.apache.kafka.common.metrics.MetricsReporter;
 import org.apache.kafka.common.requests.JoinGroupRequest;
@@ -239,6 +240,7 @@ public class AsyncKafkaConsumer<K, V> implements ConsumerDelegate<K, V> {
     private final boolean autoCommitEnabled;
     private volatile boolean closed = false;
     private final Optional<ClientTelemetryReporter> clientTelemetryReporter;
+    private Optional<Map<MetricName,KafkaMetric>> additionalMetrics;
 
     // to keep from repeatedly scanning subscriptions in poll(), cache the result during metadata updates
     private boolean cachedSubscriptionHasAllFetchPositions;
@@ -393,6 +395,7 @@ public class AsyncKafkaConsumer<K, V> implements ConsumerDelegate<K, V> {
             }
             config.logUnused();
             AppInfoParser.registerAppInfo(CONSUMER_JMX_PREFIX, clientId, metrics, time.milliseconds());
+
             log.debug("Kafka consumer initialized");
         } catch (Throwable t) {
             // call close methods if internal objects are already constructed; this is to prevent resource leak. see KAFKA-2121
@@ -642,6 +645,16 @@ public class AsyncKafkaConsumer<K, V> implements ConsumerDelegate<K, V> {
                 )
             )
         );
+    }
+
+    @Override
+    public void registerAdditionalMetrics(Map<MetricName, KafkaMetric> metrics) {
+           if(clientTelemetryReporter.isPresent()) {
+               ClientTelemetryReporter reporter = clientTelemetryReporter.get();
+               for (KafkaMetric kafkaMetric : metrics.values()) {
+                   reporter.metricChange(kafkaMetric);
+               }
+        }
     }
 
     /**

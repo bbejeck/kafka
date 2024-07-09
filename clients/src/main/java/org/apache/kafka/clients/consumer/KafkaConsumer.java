@@ -29,6 +29,7 @@ import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.errors.InterruptException;
+import org.apache.kafka.common.metrics.KafkaMetric;
 import org.apache.kafka.common.metrics.Metrics;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.utils.LogContext;
@@ -632,6 +633,12 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
      */
     public Set<TopicPartition> assignment() {
         return delegate.assignment();
+    }
+
+
+    @Override
+    public void registerAdditionalMetrics(Map<MetricName, KafkaMetric> metrics) {
+
     }
 
     /**
