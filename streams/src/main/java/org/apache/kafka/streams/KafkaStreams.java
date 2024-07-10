@@ -1424,6 +1424,8 @@ public class KafkaStreams implements AutoCloseable {
                     TimeUnit.MINUTES
                 );
             }
+
+
         } else {
             throw new IllegalStateException("The client is either already started or already stopped, cannot re-start");
         }

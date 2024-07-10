@@ -33,6 +33,7 @@ import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.kafka.common.errors.UnsupportedVersionException;
 import org.apache.kafka.common.internals.KafkaFutureImpl;
+import org.apache.kafka.common.metrics.KafkaMetric;
 import org.apache.kafka.common.metrics.Sensor;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.utils.LogContext;
@@ -472,6 +473,7 @@ public class StreamThread extends Thread implements ProcessingThread {
         final Consumer<byte[], byte[]> mainConsumer = clientSupplier.getConsumer(consumerConfigs);
         taskManager.setMainConsumer(mainConsumer);
         referenceContainer.mainConsumer = mainConsumer;
+        mainConsumer.registerAdditionalMetrics((Map<MetricName, KafkaMetric>)streamsMetrics.metrics());
 
         final StreamThread streamThread = new StreamThread(
             time,
