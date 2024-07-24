@@ -473,7 +473,6 @@ public class StreamThread extends Thread implements ProcessingThread {
         final Consumer<byte[], byte[]> mainConsumer = clientSupplier.getConsumer(consumerConfigs);
         taskManager.setMainConsumer(mainConsumer);
         referenceContainer.mainConsumer = mainConsumer;
-        mainConsumer.registerAdditionalMetrics((Map<MetricName, KafkaMetric>)streamsMetrics.metrics());
 
         final StreamThread streamThread = new StreamThread(
             time,
