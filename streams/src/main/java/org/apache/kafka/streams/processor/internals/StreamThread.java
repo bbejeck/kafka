@@ -646,6 +646,8 @@ public class StreamThread extends Thread implements ProcessingThread {
         this.stateUpdaterEnabled = InternalConfig.stateUpdaterEnabled(config.originals());
         this.processingThreadsEnabled = InternalConfig.processingThreadsEnabled(config.originals());
         this.logSummaryIntervalMs = config.getLong(StreamsConfig.LOG_SUMMARY_INTERVAL_MS_CONFIG);
+
+        mainConsumer.registerAdditionalMetrics(streamsMetrics.metricsRegistry().metrics());
     }
 
     private static final class InternalConsumerConfig extends ConsumerConfig {
