@@ -18,6 +18,7 @@ package org.apache.kafka.streams.examples.wordcount;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.Serdes;
+import org.apache.kafka.streams.ClientInstanceIds;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
@@ -27,6 +28,7 @@ import org.apache.kafka.streams.kstream.Produced;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Properties;
@@ -75,13 +77,15 @@ public final class WordCountDemo {
     static void createWordCountStream(final StreamsBuilder builder) {
         final KStream<String, String> source = builder.stream(INPUT_TOPIC);
 
-        final KTable<String, Long> counts = source
+        final KTable<String, Long> counts = source.peek((k, v)-> System.out.println("Incoming key " + k + " value " + v))
             .flatMapValues(value -> Arrays.asList(value.toLowerCase(Locale.getDefault()).split("\\W+")))
             .groupBy((key, value) -> value)
             .count();
 
         // need to override value serde to Long type
-        counts.toStream().to(OUTPUT_TOPIC, Produced.with(Serdes.String(), Serdes.Long()));
+        counts.toStream()
+                .peek((k, v)-> System.out.println("Outgoing key " + k + " value " + v))
+                .to(OUTPUT_TOPIC, Produced.with(Serdes.String(), Serdes.Long()));
     }
 
     public static void main(final String[] args) throws IOException {
@@ -103,6 +107,12 @@ public final class WordCountDemo {
 
         try {
             streams.start();
+            System.out.println("Wait for 30 seconds to print telemetry instance ids");
+            Thread.sleep(30_000);
+            final ClientInstanceIds clientInstanceIds = streams.clientInstanceIds(Duration.ofSeconds(30));
+            System.out.println("Consumer ids " + clientInstanceIds.consumerInstanceIds());
+            System.out.println("Producer ids " + clientInstanceIds.producerInstanceIds());
+            System.out.println("Admin ids " + clientInstanceIds.adminInstanceId());
             latch.await();
         } catch (final Throwable e) {
             System.exit(1);

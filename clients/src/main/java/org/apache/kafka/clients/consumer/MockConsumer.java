@@ -26,6 +26,7 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.kafka.common.errors.WakeupException;
+import org.apache.kafka.common.metrics.KafkaMetric;
 import org.apache.kafka.common.utils.LogContext;
 
 import java.time.Duration;
@@ -175,6 +176,11 @@ public class MockConsumer<K, V> implements Consumer<K, V> {
 
         }
         subscriptions.assignFromSubscribed(assignedPartitions);
+    }
+
+    @Override
+    public void registerAdditionalMetrics(Map<MetricName, KafkaMetric> metrics) {
+        
     }
 
     @Override
