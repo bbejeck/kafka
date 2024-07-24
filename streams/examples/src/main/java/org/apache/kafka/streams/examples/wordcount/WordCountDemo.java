@@ -113,8 +113,10 @@ public final class WordCountDemo {
             System.out.println("Consumer ids " + clientInstanceIds.consumerInstanceIds());
             System.out.println("Producer ids " + clientInstanceIds.producerInstanceIds());
             System.out.println("Admin ids " + clientInstanceIds.adminInstanceId());
+            System.out.println("Streams started");
             latch.await();
         } catch (final Throwable e) {
+            e.printStackTrace();
             System.exit(1);
         }
         System.exit(0);
