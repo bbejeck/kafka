@@ -646,7 +646,20 @@ public class StreamThread extends Thread implements ProcessingThread {
         this.processingThreadsEnabled = InternalConfig.processingThreadsEnabled(config.originals());
         this.logSummaryIntervalMs = config.getLong(StreamsConfig.LOG_SUMMARY_INTERVAL_MS_CONFIG);
 
-        mainConsumer.registerAdditionalMetrics(streamsMetrics.metricsRegistry().metrics());
+        mainConsumer.registerAdditionalMetrics(filterMetricsForCurrentThread(threadId,
+                streamsMetrics.metricsRegistry().metrics()));
+    }
+
+    private Map<MetricName, KafkaMetric> filterMetricsForCurrentThread(final String threadId,
+                                                                       final Map<MetricName, KafkaMetric> metrics) {
+        final Map<MetricName, KafkaMetric> filteredMetrics = new HashMap<>();
+        for (Map.Entry<MetricName, KafkaMetric> entry : metrics.entrySet()) {
+            Map<String, String> tags = entry.getKey().tags();
+            if (!tags.containsKey("thread-id") || tags.containsKey("thread-id") && tags.get("thread-id").contains(threadId)) {
+                    filteredMetrics.put(entry.getKey(), entry.getValue());
+             }
+        }
+        return filteredMetrics;
     }
 
     private static final class InternalConsumerConfig extends ConsumerConfig {
