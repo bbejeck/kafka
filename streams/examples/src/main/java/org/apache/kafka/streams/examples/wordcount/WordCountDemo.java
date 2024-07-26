@@ -64,6 +64,7 @@ public final class WordCountDemo {
         props.putIfAbsent(StreamsConfig.APPLICATION_ID_CONFIG, "streams-wordcount");
         props.putIfAbsent(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
         props.putIfAbsent(StreamsConfig.STATESTORE_CACHE_MAX_BYTES_CONFIG, 0);
+        props.putIfAbsent(StreamsConfig.NUM_STREAM_THREADS_CONFIG, 2);
         props.putIfAbsent(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
         props.putIfAbsent(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
 

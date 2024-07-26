@@ -165,7 +165,6 @@ import org.apache.kafka.common.message.RenewDelegationTokenRequestData;
 import org.apache.kafka.common.message.UnregisterBrokerRequestData;
 import org.apache.kafka.common.message.UpdateFeaturesRequestData;
 import org.apache.kafka.common.message.UpdateFeaturesResponseData.UpdatableFeatureResult;
-import org.apache.kafka.common.metrics.KafkaMetric;
 import org.apache.kafka.common.metrics.KafkaMetricsContext;
 import org.apache.kafka.common.metrics.MetricConfig;
 import org.apache.kafka.common.metrics.Metrics;
@@ -254,7 +253,6 @@ import org.apache.kafka.common.security.auth.KafkaPrincipal;
 import org.apache.kafka.common.security.scram.internals.ScramFormatter;
 import org.apache.kafka.common.security.token.delegation.DelegationToken;
 import org.apache.kafka.common.security.token.delegation.TokenInformation;
-import org.apache.kafka.common.telemetry.internals.ClientTelemetryReporter;
 import org.apache.kafka.common.utils.AppInfoParser;
 import org.apache.kafka.common.utils.ExponentialBackoff;
 import org.apache.kafka.common.utils.KafkaThread;
@@ -532,7 +530,6 @@ public class KafkaAdminClient extends AdminClient {
         String clientId = generateClientId(config);
         ApiVersions apiVersions = new ApiVersions();
         LogContext logContext = createLogContext(clientId);
-        Optional<ClientTelemetryReporter> clientTelemetryReporter;
 
         try {
             // Since we only request node information, it's safe to pass true for allowAutoTopicCreation (and it
@@ -552,8 +549,6 @@ public class KafkaAdminClient extends AdminClient {
             MetricsContext metricsContext = new KafkaMetricsContext(JMX_PREFIX,
                     config.originalsWithPrefix(CommonClientConfigs.METRICS_CONTEXT_PREFIX));
             metrics = new Metrics(metricConfig, reporters, time, metricsContext);
-            clientTelemetryReporter = CommonClientConfigs.telemetryReporter(clientId, config);
-            clientTelemetryReporter.ifPresent(telemetryReporter -> telemetryReporter.contextChange(metricsContext));
             networkClient = ClientUtils.createNetworkClient(config,
                 clientId,
                 metrics,
@@ -563,13 +558,10 @@ public class KafkaAdminClient extends AdminClient {
                 time,
                 1,
                 (int) TimeUnit.HOURS.toMillis(1),
-                null,
                 metadataManager.updater(),
-                (hostResolver == null) ? new DefaultHostResolver() : hostResolver,
-                    null,
-                    clientTelemetryReporter.map(ClientTelemetryReporter::telemetrySender).orElse(null));
+                (hostResolver == null) ? new DefaultHostResolver() : hostResolver);
             return new KafkaAdminClient(config, clientId, time, metadataManager, metrics, networkClient,
-                timeoutProcessorFactory, logContext, clientTelemetryReporter);
+                timeoutProcessorFactory, logContext);
         } catch (Throwable exc) {
             closeQuietly(metrics, "Metrics");
             closeQuietly(networkClient, "NetworkClient");
@@ -589,7 +581,7 @@ public class KafkaAdminClient extends AdminClient {
             metrics = new Metrics(new MetricConfig(), new LinkedList<>(), time);
             LogContext logContext = createLogContext(clientId);
             return new KafkaAdminClient(config, clientId, time, metadataManager, metrics,
-                client, null, logContext, null);
+                client, null, logContext);
         } catch (Throwable exc) {
             closeQuietly(metrics, "Metrics");
             throw new KafkaException("Failed to create new KafkaAdminClient", exc);
@@ -607,8 +599,7 @@ public class KafkaAdminClient extends AdminClient {
                              Metrics metrics,
                              KafkaClient client,
                              TimeoutProcessorFactory timeoutProcessorFactory,
-                             LogContext logContext,
-                             Optional<ClientTelemetryReporter> clientTelemetryReporter) {
+                             LogContext logContext) {
         this.clientId = clientId;
         this.log = logContext.logger(KafkaAdminClient.class);
         this.logContext = logContext;
@@ -632,9 +623,6 @@ public class KafkaAdminClient extends AdminClient {
             retryBackoffMaxMs,
             CommonClientConfigs.RETRY_BACKOFF_JITTER);
         this.clientTelemetryEnabled = config.getBoolean(AdminClientConfig.ENABLE_METRICS_PUSH_CONFIG);
-        List<MetricsReporter> reporters = CommonClientConfigs.metricsReporters(this.clientId, config);
-        this.clientTelemetryReporter = clientTelemetryReporter;
-        this.clientTelemetryReporter.ifPresent(reporters::add);
         this.metadataRecoveryStrategy = MetadataRecoveryStrategy.forName(config.getString(AdminClientConfig.METADATA_RECOVERY_STRATEGY_CONFIG));
         this.adminFetchMetricsManager = new AdminFetchMetricsManager(metrics);
         config.logUnused();
@@ -666,15 +654,6 @@ public class KafkaAdminClient extends AdminClient {
             }
         }
         return defaultApiTimeoutMs;
-    }
-
-    public void registerAdditionalMetrics(Map<MetricName, KafkaMetric> metrics) {
-        if(clientTelemetryReporter.isPresent()) {
-            ClientTelemetryReporter reporter = clientTelemetryReporter.get();
-            for (KafkaMetric kafkaMetric : metrics.values()) {
-                reporter.metricChange(kafkaMetric);
-            }
-        }
     }
 
     @Override

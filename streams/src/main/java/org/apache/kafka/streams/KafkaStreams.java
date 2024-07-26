@@ -1060,7 +1060,6 @@ public class KafkaStreams implements AutoCloseable {
 
         stateDirCleaner = setupStateDirCleaner();
         rocksDBMetricsRecordingService = maybeCreateRocksDBMetricsRecordingService(clientId, applicationConfigs);
-        ((KafkaAdminClient)adminClient).registerAdditionalMetrics(streamsMetrics.metricsRegistry().metrics());
     }
 
     private StreamThread createAndAddStreamThread(final long cacheSizePerThread, final int threadIdx) {
