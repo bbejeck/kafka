@@ -240,7 +240,6 @@ public class AsyncKafkaConsumer<K, V> implements ConsumerDelegate<K, V> {
     private final boolean autoCommitEnabled;
     private volatile boolean closed = false;
     private final Optional<ClientTelemetryReporter> clientTelemetryReporter;
-    private Optional<Map<MetricName,KafkaMetric>> additionalMetrics;
 
     // to keep from repeatedly scanning subscriptions in poll(), cache the result during metadata updates
     private boolean cachedSubscriptionHasAllFetchPositions;
@@ -648,12 +647,12 @@ public class AsyncKafkaConsumer<K, V> implements ConsumerDelegate<K, V> {
     }
 
     @Override
-    public void registerAdditionalMetrics(Map<MetricName, KafkaMetric> metrics) {
-           if(clientTelemetryReporter.isPresent()) {
-               ClientTelemetryReporter reporter = clientTelemetryReporter.get();
-               for (KafkaMetric kafkaMetric : metrics.values()) {
-                   reporter.metricChange(kafkaMetric);
-               }
+    public void registerAdditionalMetrics(Collection<KafkaMetric> metrics) {
+        if (clientTelemetryReporter.isPresent()) {
+            ClientTelemetryReporter reporter = clientTelemetryReporter.get();
+            for (KafkaMetric kafkaMetric : metrics) {
+                reporter.metricChange(kafkaMetric);
+            }
         }
     }
 

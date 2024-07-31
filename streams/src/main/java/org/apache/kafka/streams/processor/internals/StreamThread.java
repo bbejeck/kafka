@@ -64,11 +64,14 @@ import org.apache.kafka.streams.state.internals.ThreadCache;
 import org.slf4j.Logger;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
@@ -650,14 +653,14 @@ public class StreamThread extends Thread implements ProcessingThread {
                 streamsMetrics.metricsRegistry().metrics()));
     }
 
-    private Map<MetricName, KafkaMetric> filterMetricsForCurrentThread(final String threadId,
-                                                                       final Map<MetricName, KafkaMetric> metrics) {
-        final Map<MetricName, KafkaMetric> filteredMetrics = new HashMap<>();
-        for (Map.Entry<MetricName, KafkaMetric> entry : metrics.entrySet()) {
-            Map<String, String> tags = entry.getKey().tags();
+    private Collection<KafkaMetric> filterMetricsForCurrentThread(final String threadId,
+                                                                  final Map<MetricName, KafkaMetric> metrics) {
+        final List<KafkaMetric> filteredMetrics = new ArrayList<>();
+        for (final Map.Entry<MetricName, KafkaMetric> entry : metrics.entrySet()) {
+            final Map<String, String> tags = entry.getKey().tags();
             if (!tags.containsKey("thread-id") || tags.containsKey("thread-id") && tags.get("thread-id").contains(threadId)) {
-                    filteredMetrics.put(entry.getKey(), entry.getValue());
-             }
+                filteredMetrics.add(entry.getValue());
+            }
         }
         return filteredMetrics;
     }

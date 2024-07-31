@@ -78,14 +78,14 @@ public final class WordCountDemo {
     static void createWordCountStream(final StreamsBuilder builder) {
         final KStream<String, String> source = builder.stream(INPUT_TOPIC);
 
-        final KTable<String, Long> counts = source.peek((k, v)-> System.out.println("Incoming key " + k + " value " + v))
+        final KTable<String, Long> counts = source.peek((k, v) -> System.out.println("Incoming key " + k + " value " + v))
             .flatMapValues(value -> Arrays.asList(value.toLowerCase(Locale.getDefault()).split("\\W+")))
             .groupBy((key, value) -> value)
             .count();
 
         // need to override value serde to Long type
         counts.toStream()
-                .peek((k, v)-> System.out.println("Outgoing key " + k + " value " + v))
+                .peek((k, v) -> System.out.println("Outgoing key " + k + " value " + v))
                 .to(OUTPUT_TOPIC, Produced.with(Serdes.String(), Serdes.Long()));
     }
 

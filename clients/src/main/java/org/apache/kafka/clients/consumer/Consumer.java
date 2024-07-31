@@ -123,7 +123,7 @@ public interface Consumer<K, V> extends Closeable {
      */
     void commitAsync(Map<TopicPartition, OffsetAndMetadata> offsets, OffsetCommitCallback callback);
 
-    void registerAdditionalMetrics(Map<MetricName, KafkaMetric> metrics);
+    void registerAdditionalMetrics(Collection<KafkaMetric> metrics);
     /**
      * @see KafkaConsumer#seek(TopicPartition, long)
      */

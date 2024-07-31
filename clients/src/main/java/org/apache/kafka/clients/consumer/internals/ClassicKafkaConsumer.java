@@ -428,10 +428,10 @@ public class ClassicKafkaConsumer<K, V> implements ConsumerDelegate<K, V> {
     }
 
     @Override
-    public void registerAdditionalMetrics(Map<MetricName, KafkaMetric> metrics) {
-        if(clientTelemetryReporter.isPresent()) {
+    public void registerAdditionalMetrics(Collection<KafkaMetric> metrics) {
+        if (clientTelemetryReporter.isPresent()) {
             ClientTelemetryReporter reporter = clientTelemetryReporter.get();
-            for (KafkaMetric kafkaMetric : metrics.values()) {
+            for (KafkaMetric kafkaMetric : metrics) {
                 reporter.metricChange(kafkaMetric);
             }
         }

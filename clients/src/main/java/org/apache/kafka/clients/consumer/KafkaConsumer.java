@@ -637,7 +637,7 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 
 
     @Override
-    public void registerAdditionalMetrics(Map<MetricName, KafkaMetric> metrics) {
+    public void registerAdditionalMetrics(Collection<KafkaMetric> metrics) {
         delegate.registerAdditionalMetrics(metrics);
     }
 
