@@ -30,14 +30,14 @@ import java.util.Optional;
 /**
  *
  */
-public class StreamDelegatingMetricsReporter implements MetricsReporter {
-     private static final Logger LOG = LoggerFactory.getLogger(StreamDelegatingMetricsReporter.class);
+public class StreamsDelegatingMetricsReporter implements MetricsReporter {
+     private static final Logger LOG = LoggerFactory.getLogger(StreamsDelegatingMetricsReporter.class);
     private Consumer<?, ?> consumer;
     final String threadId;
     private static final String THREAD_ID_TAG = "thread-id";
 
 
-    public StreamDelegatingMetricsReporter(final Consumer<?, ?> consumer, final String threadId) {
+    public StreamsDelegatingMetricsReporter(final Consumer<?, ?> consumer, final String threadId) {
         this.consumer = consumer;
         this.threadId = threadId;
     }
@@ -50,7 +50,7 @@ public class StreamDelegatingMetricsReporter implements MetricsReporter {
     @Override
     public void metricChange(final KafkaMetric metric) {
         if (filteredMetric(metric).isPresent()) {
-            LOG.info("Registering metric {}", metric.metricName().name());
+            LOG.info("Registering metric {} for thread={}", metric.metricName().name(), threadId);
             consumer.registerMetric(metric);
         }
     }
@@ -67,7 +67,7 @@ public class StreamDelegatingMetricsReporter implements MetricsReporter {
     @Override
     public void metricRemoval(final KafkaMetric metric) {
         if (filteredMetric(metric).isPresent()) {
-            LOG.info("Unregistering metric {}", metric.metricName().name());
+            LOG.info("Unregistering metric {} for thread={}", metric.metricName().name(), threadId);
             consumer.unregisterMetric(metric);
         }
     }

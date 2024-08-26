@@ -50,7 +50,7 @@ import org.apache.kafka.streams.errors.TaskCorruptedException;
 import org.apache.kafka.streams.errors.TaskMigratedException;
 import org.apache.kafka.streams.internals.StreamsConfigUtils;
 import org.apache.kafka.streams.internals.metrics.ClientMetrics;
-import org.apache.kafka.streams.internals.metrics.StreamDelegatingMetricsReporter;
+import org.apache.kafka.streams.internals.metrics.StreamsDelegatingMetricsReporter;
 import org.apache.kafka.streams.processor.StandbyUpdateListener;
 import org.apache.kafka.streams.processor.StateRestoreListener;
 import org.apache.kafka.streams.processor.TaskId;
@@ -652,7 +652,7 @@ public class StreamThread extends Thread implements ProcessingThread {
         this.logSummaryIntervalMs = config.getLong(StreamsConfig.LOG_SUMMARY_INTERVAL_MS_CONFIG);
 
 
-        final StreamDelegatingMetricsReporter reporter = new StreamDelegatingMetricsReporter(mainConsumer, threadId);
+        final StreamsDelegatingMetricsReporter reporter = new StreamsDelegatingMetricsReporter(mainConsumer, threadId);
         final Metrics metricsRegistry = streamsMetrics.metricsRegistry();
         metricsRegistry.reporters().add(reporter);
         metricsRegistry.metrics().values().forEach(reporter::metricChange);
