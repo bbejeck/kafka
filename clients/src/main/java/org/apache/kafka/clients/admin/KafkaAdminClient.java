@@ -408,7 +408,6 @@ public class KafkaAdminClient extends AdminClient {
     private final boolean clientTelemetryEnabled;
     private final MetadataRecoveryStrategy metadataRecoveryStrategy;
     private final AdminFetchMetricsManager adminFetchMetricsManager;
-    private final Optional<ClientTelemetryReporter> clientTelemetryReporter;
 
 
     /**

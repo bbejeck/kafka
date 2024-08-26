@@ -647,12 +647,18 @@ public class AsyncKafkaConsumer<K, V> implements ConsumerDelegate<K, V> {
     }
 
     @Override
-    public void registerAdditionalMetrics(Collection<KafkaMetric> metrics) {
+    public void registerMetric(KafkaMetric metric) {
         if (clientTelemetryReporter.isPresent()) {
             ClientTelemetryReporter reporter = clientTelemetryReporter.get();
-            for (KafkaMetric kafkaMetric : metrics) {
-                reporter.metricChange(kafkaMetric);
-            }
+            reporter.metricChange(metric);
+        }
+    }
+
+    @Override
+    public void unregisterMetric(KafkaMetric metric) {
+        if (clientTelemetryReporter.isPresent()) {
+            ClientTelemetryReporter reporter = clientTelemetryReporter.get();
+            reporter.metricRemoval(metric);
         }
     }
 

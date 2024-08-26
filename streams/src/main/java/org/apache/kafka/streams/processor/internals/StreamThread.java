@@ -34,6 +34,7 @@ import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.kafka.common.errors.UnsupportedVersionException;
 import org.apache.kafka.common.internals.KafkaFutureImpl;
 import org.apache.kafka.common.metrics.KafkaMetric;
+import org.apache.kafka.common.metrics.Metrics;
 import org.apache.kafka.common.metrics.Sensor;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.utils.LogContext;
@@ -49,6 +50,7 @@ import org.apache.kafka.streams.errors.TaskCorruptedException;
 import org.apache.kafka.streams.errors.TaskMigratedException;
 import org.apache.kafka.streams.internals.StreamsConfigUtils;
 import org.apache.kafka.streams.internals.metrics.ClientMetrics;
+import org.apache.kafka.streams.internals.metrics.StreamDelegatingMetricsReporter;
 import org.apache.kafka.streams.processor.StandbyUpdateListener;
 import org.apache.kafka.streams.processor.StateRestoreListener;
 import org.apache.kafka.streams.processor.TaskId;
@@ -649,8 +651,11 @@ public class StreamThread extends Thread implements ProcessingThread {
         this.processingThreadsEnabled = InternalConfig.processingThreadsEnabled(config.originals());
         this.logSummaryIntervalMs = config.getLong(StreamsConfig.LOG_SUMMARY_INTERVAL_MS_CONFIG);
 
-        mainConsumer.registerAdditionalMetrics(filterMetricsForCurrentThread(threadId,
-                streamsMetrics.metricsRegistry().metrics()));
+
+        final StreamDelegatingMetricsReporter reporter = new StreamDelegatingMetricsReporter(mainConsumer, threadId);
+        final Metrics metricsRegistry = streamsMetrics.metricsRegistry();
+        metricsRegistry.reporters().add(reporter);
+        metricsRegistry.metrics().values().forEach(reporter::metricChange);
     }
 
     private Collection<KafkaMetric> filterMetricsForCurrentThread(final String threadId,

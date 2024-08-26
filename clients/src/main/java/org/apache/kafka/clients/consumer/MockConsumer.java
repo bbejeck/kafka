@@ -179,8 +179,13 @@ public class MockConsumer<K, V> implements Consumer<K, V> {
     }
 
     @Override
-    public void registerAdditionalMetrics(Collection<KafkaMetric> metrics) {
+    public void registerMetric(KafkaMetric metric) {
         
+    }
+
+    @Override
+    public void unregisterMetric(KafkaMetric metric) {
+
     }
 
     @Override

@@ -2731,8 +2731,8 @@ project(':streams:examples') {
 
     implementation project(':streams')
 
-    implementation libs.slf4jReload4j
-    //implementation "org.slf4j:slf4j-simple:2.0.7"
+    //implementation libs.slf4jReload4j
+    implementation "org.slf4j:slf4j-simple:2.0.7"
 
     testImplementation project(':streams:test-utils')
     testImplementation project(':clients').sourceSets.test.output // for org.apache.kafka.test.IntegrationTest

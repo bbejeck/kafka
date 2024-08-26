@@ -635,10 +635,14 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
         return delegate.assignment();
     }
 
+    @Override
+    public void registerMetric(KafkaMetric metric) {
+        delegate.registerMetric(metric);
+    }
 
     @Override
-    public void registerAdditionalMetrics(Collection<KafkaMetric> metrics) {
-        delegate.registerAdditionalMetrics(metrics);
+    public void unregisterMetric(KafkaMetric metric) {
+        delegate.unregisterMetric(metric);
     }
 
     /**
