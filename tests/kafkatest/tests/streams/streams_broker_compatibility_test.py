@@ -18,10 +18,9 @@ from ducktape.mark import matrix
 from ducktape.mark.resource import cluster
 from ducktape.tests.test import Test
 from ducktape.utils.util import wait_until
-from kafkatest.services.kafka import KafkaService
+from kafkatest.services.kafka import KafkaService, quorum
 from kafkatest.services.streams import StreamsBrokerCompatibilityService
 from kafkatest.services.verifiable_consumer import VerifiableConsumer
-from kafkatest.services.zookeeper import ZookeeperService
 from kafkatest.version import LATEST_0_11_0, LATEST_0_10_2, LATEST_0_10_1, LATEST_0_10_0, LATEST_1_0, LATEST_1_1, \
     LATEST_2_0, LATEST_2_1, LATEST_2_2, LATEST_2_3, LATEST_2_4, LATEST_2_5, LATEST_2_6, LATEST_2_7, LATEST_2_8, \
     LATEST_3_0, LATEST_3_1, LATEST_3_2, LATEST_3_3, LATEST_3_4, LATEST_3_5, LATEST_3_6, LATEST_3_7, LATEST_3_8, KafkaVersion
@@ -42,10 +41,9 @@ class StreamsBrokerCompatibility(Test):
 
     def __init__(self, test_context):
         super(StreamsBrokerCompatibility, self).__init__(test_context=test_context)
-        self.zk = ZookeeperService(test_context, num_nodes=1)
         self.kafka = KafkaService(test_context,
                                   num_nodes=1,
-                                  zk=self.zk,
+                                  zk=None,
                                   topics={
                                       self.input: {'partitions': 1, 'replication-factor': 1},
                                       self.output: {'partitions': 1, 'replication-factor': 1}
@@ -53,7 +51,8 @@ class StreamsBrokerCompatibility(Test):
                                   server_prop_overrides=[
                                       ["transaction.state.log.replication.factor", "1"],
                                       ["transaction.state.log.min.isr", "1"]
-                                  ])
+                                  ],
+                                  dynamicRaftQuorum=True)
         self.consumer = VerifiableConsumer(test_context,
                                            1,
                                            self.kafka,
@@ -65,13 +64,13 @@ class StreamsBrokerCompatibility(Test):
 
 
     @cluster(num_nodes=4)
-    @matrix(broker_version=[str(LATEST_0_11_0),str(LATEST_1_0),str(LATEST_1_1),str(LATEST_2_0),
-                            str(LATEST_2_1),str(LATEST_2_2),str(LATEST_2_3),str(LATEST_2_4),
-                            str(LATEST_2_5),str(LATEST_2_6),str(LATEST_2_7),str(LATEST_2_8),
+    @matrix(broker_version=[str(LATEST_2_8),
                             str(LATEST_3_0),str(LATEST_3_1),str(LATEST_3_2),str(LATEST_3_3),
                             str(LATEST_3_4),str(LATEST_3_5),str(LATEST_3_6),str(LATEST_3_7),
-                            str(LATEST_3_8)])
-    def test_compatible_brokers_eos_disabled(self, broker_version):
+                            str(LATEST_3_8)],
+            metadata_quorum=[quorum.combined_kraft]
+            )
+    def test_compatible_brokers_eos_disabled(self, broker_version, metadata_quorum):
         self.kafka.set_version(KafkaVersion(broker_version))
         self.kafka.start()
 
@@ -88,11 +87,12 @@ class StreamsBrokerCompatibility(Test):
         self.kafka.stop()
 
     @cluster(num_nodes=4)
-    @matrix(broker_version=[str(LATEST_2_5),str(LATEST_2_6),str(LATEST_2_7),str(LATEST_2_8),
+    @matrix(broker_version=[str(LATEST_2_8),
                             str(LATEST_3_0),str(LATEST_3_1),str(LATEST_3_2),str(LATEST_3_3),
                             str(LATEST_3_4),str(LATEST_3_5),str(LATEST_3_6),str(LATEST_3_7),
-                            str(LATEST_3_8)])
-    def test_compatible_brokers_eos_v2_enabled(self, broker_version):
+                            str(LATEST_3_8)],
+            metadata_quorum=[quorum.combined_kraft])
+    def test_compatible_brokers_eos_v2_enabled(self, broker_version, metadata_quorum):
         self.kafka.set_version(KafkaVersion(broker_version))
         self.kafka.start()
 
@@ -109,10 +109,10 @@ class StreamsBrokerCompatibility(Test):
         self.kafka.stop()
 
     @cluster(num_nodes=4)
-    @parametrize(broker_version=str(LATEST_0_10_2))
-    @parametrize(broker_version=str(LATEST_0_10_1))
-    @parametrize(broker_version=str(LATEST_0_10_0))
-    def test_fail_fast_on_incompatible_brokers(self, broker_version):
+    @parametrize(broker_version=str(LATEST_0_10_2), metadata_quorum=quorum.combined_kraft)
+    @parametrize(broker_version=str(LATEST_0_10_1), metadata_quorum=quorum.combined_kraft)
+    @parametrize(broker_version=str(LATEST_0_10_0), metadata_quorum=quorum.combined_kraft)
+    def test_fail_fast_on_incompatible_brokers(self, broker_version, metadata_quorum):
         self.kafka.set_version(KafkaVersion(broker_version))
         self.kafka.start()
 
@@ -127,15 +127,15 @@ class StreamsBrokerCompatibility(Test):
         self.kafka.stop()
 
     @cluster(num_nodes=4)
-    @parametrize(broker_version=str(LATEST_2_4))
-    @parametrize(broker_version=str(LATEST_2_3))
-    @parametrize(broker_version=str(LATEST_2_2))
-    @parametrize(broker_version=str(LATEST_2_1))
-    @parametrize(broker_version=str(LATEST_2_0))
-    @parametrize(broker_version=str(LATEST_1_1))
-    @parametrize(broker_version=str(LATEST_1_0))
-    @parametrize(broker_version=str(LATEST_0_11_0))
-    def test_fail_fast_on_incompatible_brokers_if_eos_v2_enabled(self, broker_version):
+    @parametrize(broker_version=str(LATEST_2_4), metadata_quorum=quorum.combined_kraft)
+    @parametrize(broker_version=str(LATEST_2_3), metadata_quorum=quorum.combined_kraft)
+    @parametrize(broker_version=str(LATEST_2_2), metadata_quorum=quorum.combined_kraft)
+    @parametrize(broker_version=str(LATEST_2_1), metadata_quorum=quorum.combined_kraft)
+    @parametrize(broker_version=str(LATEST_2_0), metadata_quorum=quorum.combined_kraft)
+    @parametrize(broker_version=str(LATEST_1_1), metadata_quorum=quorum.combined_kraft)
+    @parametrize(broker_version=str(LATEST_1_0), metadata_quorum=quorum.combined_kraft)
+    @parametrize(broker_version=str(LATEST_0_11_0), metadata_quorum=quorum.combined_kraft)
+    def test_fail_fast_on_incompatible_brokers_if_eos_v2_enabled(self, broker_version, metadata_quorum):
         self.kafka.set_version(KafkaVersion(broker_version))
         self.kafka.start()
 
