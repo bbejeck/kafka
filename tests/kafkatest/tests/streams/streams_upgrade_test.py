@@ -19,10 +19,9 @@ from ducktape.mark import matrix, ignore
 from ducktape.mark.resource import cluster
 from ducktape.tests.test import Test
 from ducktape.utils.util import wait_until
-from kafkatest.services.kafka import KafkaService
+from kafkatest.services.kafka import KafkaService, quorum
 from kafkatest.services.streams import StreamsSmokeTestDriverService, StreamsSmokeTestJobRunnerService, \
     StreamsUpgradeTestJobRunnerService
-from kafkatest.services.zookeeper import ZookeeperService
 from kafkatest.tests.streams.utils import extract_generation_from_logs, extract_generation_id
 from kafkatest.version import LATEST_0_10_0, LATEST_0_10_1, LATEST_0_10_2, LATEST_0_11_0, LATEST_1_0, LATEST_1_1, \
     LATEST_2_0, LATEST_2_1, LATEST_2_2, LATEST_2_3, LATEST_2_4, LATEST_2_5, LATEST_2_6, LATEST_2_7, LATEST_2_8, \
@@ -31,10 +30,7 @@ from kafkatest.version import LATEST_0_10_0, LATEST_0_10_1, LATEST_0_10_2, LATES
 
 # broker 0.10.0 is not compatible with newer Kafka Streams versions
 # broker 0.10.1 and 0.10.2 do not support headers, as required by suppress() (since v2.2.1)
-broker_upgrade_versions = [str(LATEST_0_11_0), str(LATEST_1_0), str(LATEST_1_1),
-                           str(LATEST_2_0), str(LATEST_2_1), str(LATEST_2_2), str(LATEST_2_3),
-                           str(LATEST_2_4), str(LATEST_2_5), str(LATEST_2_6), str(LATEST_2_7),
-                           str(LATEST_2_8), str(LATEST_3_0), str(LATEST_3_1), str(LATEST_3_2),
+broker_upgrade_versions = [str(LATEST_2_8), str(LATEST_3_0), str(LATEST_3_1), str(LATEST_3_2),
                            str(LATEST_3_3), str(LATEST_3_4), str(LATEST_3_5), str(LATEST_3_6),
                            str(LATEST_3_7), str(LATEST_3_8), str(DEV_BRANCH)]
 
@@ -113,8 +109,8 @@ class StreamsUpgradeTest(Test):
 
     @ignore
     @cluster(num_nodes=6)
-    @matrix(from_version=broker_upgrade_versions, to_version=broker_upgrade_versions)
-    def test_upgrade_downgrade_brokers(self, from_version, to_version):
+    @matrix(from_version=broker_upgrade_versions, to_version=broker_upgrade_versions, metadata_quorum=[quorum.combined_kraft])
+    def test_upgrade_downgrade_brokers(self, from_version, to_version, metadata_quorum):
         """
         Start a smoke test client then perform rolling upgrades on the broker.
         """
@@ -148,14 +144,11 @@ class StreamsUpgradeTest(Test):
             'tagg' : { 'partitions': self.partitions, 'replication-factor': self.replication,
                        'configs': {"min.insync.replicas": self.isr} }
         }
-
-        # Setup phase
-        self.zk = ZookeeperService(self.test_context, num_nodes=1)
-        self.zk.start()
-
         # number of nodes needs to be >= 3 for the smoke test
         self.kafka = KafkaService(self.test_context, num_nodes=self.num_kafka_nodes,
-                                  zk=self.zk, version=KafkaVersion(from_version), topics=self.topics)
+                                  zk=None, version=KafkaVersion(from_version), topics=self.topics,
+                                  controller_num_nodes_override=1, dynamicRaftQuorum=True
+                                  )
         self.kafka.start()
 
         # allow some time for topics to be created
@@ -203,10 +196,10 @@ class StreamsUpgradeTest(Test):
         processor.node.account.ssh_capture("grep SMOKE-TEST-CLIENT-CLOSED %s" % processor.STDOUT_FILE, allow_fail=False)
 
     @cluster(num_nodes=6)
-    @matrix(from_version=metadata_1_versions)
-    @matrix(from_version=metadata_2_versions)
-    @matrix(from_version=fk_join_versions)
-    def test_rolling_upgrade_with_2_bounces(self, from_version):
+    @matrix(from_version=metadata_1_versions, metadata_quorum=[quorum.combined_kraft])
+    @matrix(from_version=metadata_2_versions, metadata_quorum=[quorum.combined_kraft])
+    @matrix(from_version=fk_join_versions, metadata_quorum=[quorum.combined_kraft])
+    def test_rolling_upgrade_with_2_bounces(self, from_version, metadata_quorum):
         """
         This test verifies that the cluster successfully upgrades despite changes in the metadata and FK
         join protocols.
@@ -272,8 +265,8 @@ class StreamsUpgradeTest(Test):
         self.stop_and_await()
 
     @cluster(num_nodes=6)
-    @matrix(from_version=[str(LATEST_3_2), str(DEV_VERSION)],  upgrade=[True, False])
-    def test_upgrade_downgrade_state_updater(self, from_version, upgrade):
+    @matrix(from_version=[str(LATEST_3_2), str(DEV_VERSION)],  upgrade=[True, False], metadata_quorum=[quorum.combined_kraft])
+    def test_upgrade_downgrade_state_updater(self, from_version, upgrade, metadata_quorum):
         """
         Starts 3 KafkaStreams instances, and enables / disables state restoration
         for the instances in a rolling bounce.
@@ -312,10 +305,7 @@ class StreamsUpgradeTest(Test):
         self.stop_and_await()
 
     def set_up_services(self):
-        self.zk = ZookeeperService(self.test_context, num_nodes=1)
-        self.zk.start()
-
-        self.kafka = KafkaService(self.test_context, num_nodes=1, zk=self.zk, topics=self.topics)
+        self.kafka = KafkaService(self.test_context, num_nodes=1, zk=None, topics=self.topics, dynamicRaftQuorum=True)
         self.kafka.start()
 
         self.driver = StreamsSmokeTestDriverService(self.test_context, self.kafka)
