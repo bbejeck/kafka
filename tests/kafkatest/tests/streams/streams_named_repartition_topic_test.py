@@ -54,7 +54,8 @@ class StreamsNamedRepartitionTopicTest(Test):
     @cluster(num_nodes=8)
     @matrix(metadata_quorum=[quorum.combined_kraft])
     def test_upgrade_topology_with_named_repartition_topic(self, metadata_quorum):
-
+        self.kafka.start()
+        
         processor1 = StreamsNamedRepartitionTopicService(self.test_context, self.kafka)
         processor2 = StreamsNamedRepartitionTopicService(self.test_context, self.kafka)
         processor3 = StreamsNamedRepartitionTopicService(self.test_context, self.kafka)
