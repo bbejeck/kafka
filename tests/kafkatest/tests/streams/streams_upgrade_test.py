@@ -147,7 +147,8 @@ class StreamsUpgradeTest(Test):
         self.stop_and_await()
 
     @cluster(num_nodes=6)
-    def test_version_probing_upgrade(self):
+    @matrix(metadata_quorum=[quorum.combined_kraft])
+    def test_version_probing_upgrade(self, metadata_quorum):
         """
         Starts 3 KafkaStreams instances, and upgrades one-by-one to "future version"
         """
