@@ -52,15 +52,12 @@ class StreamsBrokerCompatibility(Test):
                                       ["transaction.state.log.replication.factor", "1"],
                                       ["transaction.state.log.min.isr", "1"]
                                   ],
-                                  dynamicRaftQuorum=True)
+                                  dynamicRaftQuorum=False)
         self.consumer = VerifiableConsumer(test_context,
                                            1,
                                            self.kafka,
                                            self.output,
                                            "stream-broker-compatibility-verify-consumer")
-
-    def setUp(self):
-        self.zk.start()
 
 
     @cluster(num_nodes=4)
