@@ -215,7 +215,7 @@ class StreamsUpgradeTest(Test):
         self.stop_and_await()
 
     def set_up_services(self):
-        self.kafka = KafkaService(self.test_context, num_nodes=1, zk=None, topics=self.topics, dynamicRaftQuorum=True)
+        self.kafka = KafkaService(self.test_context, num_nodes=1, zk=None, topics=self.topics)
         self.kafka.start()
 
         self.driver = StreamsSmokeTestDriverService(self.test_context, self.kafka)

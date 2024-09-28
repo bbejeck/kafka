@@ -46,7 +46,7 @@ class StreamsOptimizedTest(Test):
         }
 
         self.kafka = KafkaService(self.test_context, num_nodes=3, controller_num_nodes_override=1,
-                                  zk=None, topics=self.topics, dynamicRaftQuorum=True)
+                                  zk=None, topics=self.topics)
 
         self.producer = VerifiableProducer(self.test_context,
                                            1,
