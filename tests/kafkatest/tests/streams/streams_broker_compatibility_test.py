@@ -46,8 +46,7 @@ class StreamsBrokerCompatibility(Test):
                                   server_prop_overrides=[
                                       ["transaction.state.log.replication.factor", "1"],
                                       ["transaction.state.log.min.isr", "1"]
-                                  ],
-                                  dynamicRaftQuorum=False)
+                                  ])
         self.consumer = VerifiableConsumer(test_context,
                                            1,
                                            self.kafka,
