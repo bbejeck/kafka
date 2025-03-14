@@ -82,6 +82,9 @@ public final class WordCountDemo {
         props.putIfAbsent(StreamsConfig.STATESTORE_CACHE_MAX_BYTES_CONFIG, 0);
         props.putIfAbsent(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
         props.putIfAbsent(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
+        props.putIfAbsent(StreamsConfig.ENABLE_METRICS_PUSH_CONFIG, true);
+        props.putIfAbsent(StreamsConfig.consumerPrefix("enable.metrics.push"), true);
+        props.putIfAbsent(StreamsConfig.producerPrefix("enable.metrics.push"), true);
 
         // setting offset reset to earliest so that we can re-run the demo code with the same pre-loaded data
         // Note: To re-run the demo, you need to use the offset reset tool:
