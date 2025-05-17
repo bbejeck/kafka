@@ -54,8 +54,8 @@ import java.util.concurrent.CountDownLatch;
  */
 public final class WordCountDemo {
 
-    public static final String INPUT_TOPIC = "streams-plaintext-input";
-    public static final String OUTPUT_TOPIC = "streams-wordcount-output";
+    public static final String INPUT_TOPIC = "input";
+    public static final String OUTPUT_TOPIC = "output";
     private static final Logger LOG = LoggerFactory.getLogger(WordCountDemo.class);
     int messageCount = 100;
 
