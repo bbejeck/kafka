@@ -27,7 +27,6 @@ import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.kstream.KStream;
-import org.apache.kafka.streams.kstream.KTable;
 import org.apache.kafka.streams.kstream.Produced;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,6 +37,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 
 /**
@@ -64,7 +64,7 @@ public final class WordCountDemo {
         if (args.length > 0) {
             path = args[0];
         } else {
-            path = "streams/examples/src/main/java/org/apache/kafka/streams/examples/wordcount/streams.properties";
+            path = "streams/examples/src/test/java/org/apache/kafka/streams/examples/wordcount/streams.properties";
         }
         final Properties props = new Properties();
         if (path != null) {
@@ -72,7 +72,7 @@ public final class WordCountDemo {
                 props.load(fis);
             }
             if (args.length > 1) {
-                System.out.println("Warning: Some command line arguments were ignored. This demo only accepts an optional configuration file.");
+                LOG.info("Warning: Some command line arguments were ignored. This demo only accepts an optional configuration file.");
             }
         }
         props.putIfAbsent(StreamsConfig.APPLICATION_ID_CONFIG, "streams-wordcount");
@@ -80,9 +80,11 @@ public final class WordCountDemo {
         props.putIfAbsent(StreamsConfig.STATESTORE_CACHE_MAX_BYTES_CONFIG, 0);
         props.putIfAbsent(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
         props.putIfAbsent(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
-        props.putIfAbsent(StreamsConfig.ENABLE_METRICS_PUSH_CONFIG, true);
-        props.putIfAbsent(StreamsConfig.consumerPrefix("enable.metrics.push"), true);
-        props.putIfAbsent(StreamsConfig.producerPrefix("enable.metrics.push"), true);
+        props.putIfAbsent(StreamsConfig.ENABLE_METRICS_PUSH_CONFIG, false);
+        props.putIfAbsent(StreamsConfig.consumerPrefix("enable.metrics.push"), false);
+        props.putIfAbsent(StreamsConfig.producerPrefix("enable.metrics.push"), false);
+        LOG.info("Properties {} ", props);
+
 
         // setting offset reset to earliest so that we can re-run the demo code with the same pre-loaded data
         // Note: To re-run the demo, you need to use the offset reset tool:
@@ -94,26 +96,39 @@ public final class WordCountDemo {
     static void createWordCountStream(final StreamsBuilder builder) {
         final KStream<String, String> source = builder.stream(INPUT_TOPIC);
 
-        final KTable<String, Long> counts = source.peek((key, value) -> System.out.printf("Incoming record word: %s%n", value))
+        source.peek((key, value) -> LOG.info("Incoming record phrase: {}", value))
                 .flatMapValues(value -> Arrays.asList(value.toLowerCase(Locale.getDefault()).split("\\W+")))
-                .groupBy((key, value) -> value)
-                .count();
+                .peek((key, value) -> LOG.info("Outgoing key: {} value: {}", key, value))
+                .to(OUTPUT_TOPIC, Produced.with(Serdes.String(), Serdes.String()));
+    }
 
-        // need to override value serde to Long type
-        counts.toStream()
-                .peek((key, value) -> System.out.printf("Outgoing records: %s Count: %d%n", key, value))
-                .to(OUTPUT_TOPIC, Produced.with(Serdes.String(), Serdes.Long()));
+    static void createTopics(final Properties props) {
+        try (Admin admin = Admin.create(props)) {
+            // List existing topics
+            try {
+                Set<String> existingTopics = admin.listTopics().names().get();
+                existingTopics.forEach(topic ->
+                        LOG.info("Found existing topic: {}", topic));
+
+                if (!existingTopics.contains(INPUT_TOPIC) || !existingTopics.contains(OUTPUT_TOPIC)) {
+                    NewTopic inputTopic = new NewTopic(INPUT_TOPIC, 3, (short) 3);
+                    NewTopic outputTopic = new NewTopic(OUTPUT_TOPIC, 3, (short) 3);
+                    try {
+                        admin.createTopics(Arrays.asList(inputTopic, outputTopic));
+                        LOG.info("Created input and output topics.");
+                    } catch (Exception e) {
+                        LOG.info("Error creating topics: {}", e.getMessage());
+                    }
+                }
+            } catch (Exception e) {
+                LOG.info("Error listing topics: {}", e.getMessage());
+            }
+        }
     }
 
     public static void main(final String[] args) throws IOException {
         final Properties props = streamsConfig(args);
-
-        try (Admin admin = Admin.create(props)) {
-            NewTopic inputTopic = new NewTopic(INPUT_TOPIC, 3, (short) 3);
-            NewTopic outputTopic = new NewTopic(OUTPUT_TOPIC, 3, (short) 3);
-            admin.createTopics(Arrays.asList(inputTopic, outputTopic));
-            System.out.printf("Created input and output topics.%n");
-        }
+        //createTopics(props);
 
         // List of 100 Kafka phrases
         List<String> kafkaWords = Arrays.asList(
@@ -159,12 +174,13 @@ public final class WordCountDemo {
 
                 int counter = 0;
                 while (true) {
+                    LOG.info("Sending message {} to topic {}", counter, INPUT_TOPIC);
                     kafkaWords.forEach(word -> kafkaProducer.send(new ProducerRecord<>(INPUT_TOPIC, null, word),
                             (metadata, exception) -> {
                                 if (exception != null) {
-                                    System.out.printf("Error while producing message to topic %s: %s%n", metadata.topic(), exception.getMessage());
+                                    LOG.error("Error while producing message to topic {}: {}", metadata.topic(), exception.getMessage(), exception);
                                 } else {
-                                    System.out.printf("Produced message to topic %s with offset %d%n", metadata.topic(), metadata.offset());
+                                    LOG.info("Produced message to topic {} with offset {}", metadata.topic(), metadata.offset());
                                 }
                             }));
                     counter++;

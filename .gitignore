@@ -63,3 +63,4 @@ kafka.Kafka
 __pycache__
 
 streams/examples/src/main/java/org/apache/kafka/streams/examples/wordcount/streams.properties
+/streams/examples/src/test/java/org/apache/kafka/streams/examples/wordcount/streams.properties
