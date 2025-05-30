@@ -100,8 +100,11 @@ public final class WordCountDemo {
 
         source.peek((key, value) -> LOG.info("Incoming record phrase: {}", value))
                 .flatMapValues(value -> Arrays.asList(value.toLowerCase(Locale.getDefault()).split("\\W+")))
+                .groupBy(((key, value) -> value))
+                .count()
+                .toStream()
                 .peek((key, value) -> LOG.info("Outgoing key: {} value: {}", key, value))
-                .to(OUTPUT_TOPIC, Produced.with(Serdes.String(), Serdes.String()));
+                .to(OUTPUT_TOPIC, Produced.with(Serdes.String(), Serdes.Long()));
     }
 
     static void createTopics(final Properties props) {
