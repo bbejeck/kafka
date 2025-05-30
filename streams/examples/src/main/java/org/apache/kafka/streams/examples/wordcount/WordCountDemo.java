@@ -84,6 +84,7 @@ public final class WordCountDemo {
         props.putIfAbsent(StreamsConfig.ENABLE_METRICS_PUSH_CONFIG, false);
         props.putIfAbsent(StreamsConfig.consumerPrefix("enable.metrics.push"), false);
         props.putIfAbsent(StreamsConfig.producerPrefix("enable.metrics.push"), false);
+        props.put(StreamsConfig.producerPrefix(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG), false);
         LOG.info("Properties {} ", props);
 
 
@@ -171,6 +172,7 @@ public final class WordCountDemo {
         final Thread producer = new Thread(() -> {
             props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, Serdes.String().serializer().getClass().getName());
             props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, Serdes.String().serializer().getClass().getName());
+            props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, false);
             try (final KafkaProducer<String, String> kafkaProducer = new KafkaProducer<>(props)) {
 
                 int counter = 0;
