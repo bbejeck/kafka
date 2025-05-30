@@ -28,6 +28,7 @@ import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.Produced;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,7 +65,7 @@ public final class WordCountDemo {
         if (args.length > 0) {
             path = args[0];
         } else {
-            path = "streams/examples/src/test/java/org/apache/kafka/streams/examples/wordcount/streams.properties";
+            path = "streams/examples/src/main/java/org/apache/kafka/streams/examples/wordcount/streams.properties";
         }
         final Properties props = new Properties();
         if (path != null) {
@@ -103,24 +104,24 @@ public final class WordCountDemo {
     }
 
     static void createTopics(final Properties props) {
-        try (Admin admin = Admin.create(props)) {
+        try (final Admin admin = Admin.create(props)) {
             // List existing topics
             try {
-                Set<String> existingTopics = admin.listTopics().names().get();
+                final Set<String> existingTopics = admin.listTopics().names().get();
                 existingTopics.forEach(topic ->
                         LOG.info("Found existing topic: {}", topic));
 
                 if (!existingTopics.contains(INPUT_TOPIC) || !existingTopics.contains(OUTPUT_TOPIC)) {
-                    NewTopic inputTopic = new NewTopic(INPUT_TOPIC, 3, (short) 3);
-                    NewTopic outputTopic = new NewTopic(OUTPUT_TOPIC, 3, (short) 3);
+                    final NewTopic inputTopic = new NewTopic(INPUT_TOPIC, 3, (short) 6);
+                    final NewTopic outputTopic = new NewTopic(OUTPUT_TOPIC, 3, (short) 6);
                     try {
                         admin.createTopics(Arrays.asList(inputTopic, outputTopic));
                         LOG.info("Created input and output topics.");
-                    } catch (Exception e) {
+                    } catch (final Exception e) {
                         LOG.info("Error creating topics: {}", e.getMessage());
                     }
                 }
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 LOG.info("Error listing topics: {}", e.getMessage());
             }
         }
@@ -128,10 +129,10 @@ public final class WordCountDemo {
 
     public static void main(final String[] args) throws IOException {
         final Properties props = streamsConfig(args);
-        //createTopics(props);
+        createTopics(props);
 
         // List of 100 Kafka phrases
-        List<String> kafkaWords = Arrays.asList(
+        final List<String> kafkaWords = Arrays.asList(
                 "Kafka connects the world", "Stream processing made easy", "Producers and Consumers in harmony",
                 "Zookeeper orchestrates", "Brokers handle the load", "Messages in partitions",
                 "Topic is the name of the game", "Exactly-once semantics", "At-least-once delivery",
@@ -167,10 +168,10 @@ public final class WordCountDemo {
                 "Kafka as pub-sub evolution", "Event mesh encompassing all"
         );
 
-        Thread producer = new Thread(() -> {
+        final Thread producer = new Thread(() -> {
             props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, Serdes.String().serializer().getClass().getName());
             props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, Serdes.String().serializer().getClass().getName());
-            try (KafkaProducer<String, String> kafkaProducer = new KafkaProducer<>(props)) {
+            try (final KafkaProducer<String, String> kafkaProducer = new KafkaProducer<>(props)) {
 
                 int counter = 0;
                 while (true) {
@@ -186,7 +187,7 @@ public final class WordCountDemo {
                     counter++;
                     try {
                         Thread.sleep(250);
-                    } catch (InterruptedException e) {
+                    } catch (final InterruptedException e) {
                         // don't care
                     }
                 }
