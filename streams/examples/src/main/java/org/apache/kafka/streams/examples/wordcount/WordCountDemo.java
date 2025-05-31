@@ -120,8 +120,8 @@ public final class WordCountDemo {
                         LOG.info("Found existing topic: {}", topic));
 
                 if (!existingTopics.contains(INPUT_TOPIC) || !existingTopics.contains(OUTPUT_TOPIC)) {
-                    final NewTopic inputTopic = new NewTopic(INPUT_TOPIC, 3, (short) 6);
-                    final NewTopic outputTopic = new NewTopic(OUTPUT_TOPIC, 3, (short) 6);
+                    final NewTopic inputTopic = new NewTopic(INPUT_TOPIC, 6, (short) 3);
+                    final NewTopic outputTopic = new NewTopic(OUTPUT_TOPIC, 6, (short) 3);
                     try {
                         admin.createTopics(Arrays.asList(inputTopic, outputTopic));
                         LOG.info("Created input and output topics.");
