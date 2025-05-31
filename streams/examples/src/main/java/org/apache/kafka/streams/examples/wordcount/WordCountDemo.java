@@ -26,7 +26,10 @@ import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
+import org.apache.kafka.streams.Topology;
+import org.apache.kafka.streams.kstream.Grouped;
 import org.apache.kafka.streams.kstream.KStream;
+import org.apache.kafka.streams.kstream.Materialized;
 import org.apache.kafka.streams.kstream.Produced;
 
 import org.slf4j.Logger;
@@ -40,6 +43,8 @@ import java.util.Locale;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
+
+import static java.lang.System.exit;
 
 /**
  * Demonstrates, using the high-level KStream DSL, how to implement the WordCount program
@@ -55,10 +60,9 @@ import java.util.concurrent.CountDownLatch;
  */
 public final class WordCountDemo {
 
-    public static final String INPUT_TOPIC = "input";
-    public static final String OUTPUT_TOPIC = "output";
+    public static final String INPUT_TOPIC = "k2-test-input";
+    public static final String OUTPUT_TOPIC = "k2-test-output";
     private static final Logger LOG = LoggerFactory.getLogger(WordCountDemo.class);
-    int messageCount = 100;
 
     static Properties streamsConfig(final String[] args) throws IOException {
         final String path;
@@ -98,12 +102,12 @@ public final class WordCountDemo {
     static void createWordCountStream(final StreamsBuilder builder) {
         final KStream<String, String> source = builder.stream(INPUT_TOPIC);
 
-        source.peek((key, value) -> LOG.info("Incoming record phrase: {}", value))
+        source.peek((key, value) -> LOG.debug("Incoming record phrase: {}", value))
                 .flatMapValues(value -> Arrays.asList(value.toLowerCase(Locale.getDefault()).split("\\W+")))
-                .groupBy(((key, value) -> value))
-                .count()
+                .groupBy(((key, value) -> value), Grouped.as("word-key"))
+                .count(Materialized.as("word-frequency"))
                 .toStream()
-                .peek((key, value) -> LOG.info("Outgoing key: {} value: {}", key, value))
+                .peek((key, value) -> LOG.debug("Outgoing key: {} value: {}", key, value))
                 .to(OUTPUT_TOPIC, Produced.with(Serdes.String(), Serdes.Long()));
     }
 
@@ -172,7 +176,7 @@ public final class WordCountDemo {
                 "Kafka as pub-sub evolution", "Event mesh encompassing all"
         );
 
-        final Thread producer = new Thread(() -> {
+        final Thread producerThread = new Thread(() -> {
             props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, Serdes.String().serializer().getClass().getName());
             props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, Serdes.String().serializer().getClass().getName());
             props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, false);
@@ -186,7 +190,7 @@ public final class WordCountDemo {
                                 if (exception != null) {
                                     LOG.error("Error while producing message to topic {}: {}", metadata.topic(), exception.getMessage(), exception);
                                 } else {
-                                    LOG.info("Produced message to topic {} with offset {}", metadata.topic(), metadata.offset());
+                                    LOG.debug("Produced message to topic {} with offset {}", metadata.topic(), metadata.offset());
                                 }
                             }));
                     counter++;
@@ -199,11 +203,13 @@ public final class WordCountDemo {
             }
         });
 
-        producer.start();
+        producerThread.start();
         
         final StreamsBuilder builder = new StreamsBuilder();
         createWordCountStream(builder);
-        final KafkaStreams streams = new KafkaStreams(builder.build(), props);
+        final Topology topology = builder.build();
+        LOG.info("Topology description: {}", topology.describe());
+        final KafkaStreams streams = new KafkaStreams(topology, props);
         final CountDownLatch latch = new CountDownLatch(1);
 
         // attach shutdown handler to catch control-c
@@ -219,8 +225,8 @@ public final class WordCountDemo {
             streams.start();
             latch.await();
         } catch (final Throwable e) {
-            System.exit(1);
+            exit(1);
         }
-        System.exit(0);
+        exit(0);
     }
 }
