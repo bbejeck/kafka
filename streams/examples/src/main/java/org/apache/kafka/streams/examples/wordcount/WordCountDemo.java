@@ -24,6 +24,7 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
+import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.Topology;
@@ -32,14 +33,17 @@ import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.Materialized;
 import org.apache.kafka.streams.kstream.Produced;
 
+import org.apache.kafka.streams.kstream.TimeWindows;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -89,6 +93,10 @@ public final class WordCountDemo {
         props.putIfAbsent(StreamsConfig.consumerPrefix("enable.metrics.push"), false);
         props.putIfAbsent(StreamsConfig.producerPrefix("enable.metrics.push"), false);
         props.put(StreamsConfig.producerPrefix(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG), false);
+        props.put(StreamsConfig.REPLICATION_FACTOR_CONFIG, 3);
+        props.put(StreamsConfig.REPARTITION_PURGE_INTERVAL_MS_CONFIG, Long.MAX_VALUE);
+        props.put(StreamsConfig.NUM_STANDBY_REPLICAS_CONFIG, 1);
+        props.put(StreamsConfig.topicPrefix("segment.bytes"), -1);
         LOG.info("Properties {} ", props);
 
 
@@ -105,8 +113,10 @@ public final class WordCountDemo {
         source.peek((key, value) -> LOG.debug("Incoming record phrase: {}", value))
                 .flatMapValues(value -> Arrays.asList(value.toLowerCase(Locale.getDefault()).split("\\W+")))
                 .groupBy(((key, value) -> value), Grouped.as("word-key"))
+                .windowedBy(TimeWindows.ofSizeAndGrace(Duration.ofSeconds(30), Duration.ofSeconds(10)))
                 .count(Materialized.as("word-frequency"))
                 .toStream()
+                .map((key, value) -> KeyValue.pair(key.key(), value))
                 .peek((key, value) -> LOG.debug("Outgoing key: {} value: {}", key, value))
                 .to(OUTPUT_TOPIC, Produced.with(Serdes.String(), Serdes.Long()));
     }
@@ -184,7 +194,7 @@ public final class WordCountDemo {
 
                 int counter = 0;
                 while (true) {
-                    LOG.info("Sending message {} to topic {}", counter, INPUT_TOPIC);
+                    LOG.debug("Sending message {} to topic {}", counter, INPUT_TOPIC);
                     kafkaWords.forEach(word -> kafkaProducer.send(new ProducerRecord<>(INPUT_TOPIC, null, word),
                             (metadata, exception) -> {
                                 if (exception != null) {
