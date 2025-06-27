@@ -114,7 +114,7 @@ public final class WordCountDemo {
         // need to override value serde to Long type
         counts.toStream()
                 .leftJoin(globalTable, (k, v) -> k, (v1, v2) -> v1 + 1)
-                .peek((key, value) -> System.out.printf("Outgoing records: %s Count: %d%n", key, value))
+                .peek((key, value) -> LOG.info("Outgoing records: {} Count: {}", key, value))
                 .to(OUTPUT_TOPIC, Produced.with(Serdes.String(), Serdes.Long()));
     }
 
