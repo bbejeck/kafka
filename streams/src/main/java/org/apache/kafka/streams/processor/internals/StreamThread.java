@@ -2029,16 +2029,18 @@ public class StreamThread extends Thread implements ProcessingThread {
         if (stateUpdaterEnabled) {
             restoreConsumerInstanceIdFuture = stateUpdater.restoreConsumerInstanceId(timeout);
         } else {
-            if (restoreConsumerInstanceIdFuture.isDone()) {
-                if (restoreConsumerInstanceIdFuture.isCompletedExceptionally()) {
-                    restoreConsumerInstanceIdFuture = new KafkaFutureImpl<>();
+            if (restoreConsumerInstanceIdFuture != null) {
+                if (restoreConsumerInstanceIdFuture.isDone()) {
+                    if (restoreConsumerInstanceIdFuture.isCompletedExceptionally()) {
+                        restoreConsumerInstanceIdFuture = new KafkaFutureImpl<>();
+                        setDeadline = true;
+                    }
+                } else {
                     setDeadline = true;
                 }
-            } else {
-                setDeadline = true;
             }
+            result.put(getName() + "-restore-consumer", restoreConsumerInstanceIdFuture);
         }
-        result.put(getName() + "-restore-consumer", restoreConsumerInstanceIdFuture);
 
         if (producerInstanceIdFuture.isDone()) {
             if (producerInstanceIdFuture.isCompletedExceptionally()) {

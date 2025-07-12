@@ -23,9 +23,11 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.Serdes;
+import org.apache.kafka.streams.ClientInstanceIds;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
+import org.apache.kafka.streams.internals.ClientInstanceIdsImpl;
 import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.GlobalKTable;
 import org.apache.kafka.streams.kstream.KStream;
@@ -246,8 +248,15 @@ public final class WordCountDemo {
             try {
                 streams.cleanUp();
                 streams.start();
+                Thread.sleep(60_000L);
+                ClientInstanceIds clientInstanceIds = streams.clientInstanceIds(Duration.ofSeconds(360));
+                System.out.println("!! Admin client instance ids " + clientInstanceIds.adminInstanceId());
+                System.out.printf("!! Consumer client instance ids %s%n", clientInstanceIds.consumerInstanceIds());
+                System.out.printf("!! Producer client instance ids %s%n", clientInstanceIds.producerInstanceIds());
                 latch.await();
             } catch (final Throwable e) {
+                e.printStackTrace();
+                System.out.printf("!!Error %s%n", e.getMessage());
                 System.exit(1);
             }
             System.exit(0);

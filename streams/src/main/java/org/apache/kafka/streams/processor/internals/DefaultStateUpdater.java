@@ -17,6 +17,7 @@
 package org.apache.kafka.streams.processor.internals;
 
 import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.common.KafkaFuture;
 import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.Uuid;
@@ -996,7 +997,10 @@ public class DefaultStateUpdater implements StateUpdater {
 
     @Override
     public KafkaFutureImpl<Uuid> restoreConsumerInstanceId(final Duration timeout) {
-        return stateUpdaterThread.restoreConsumerInstanceId(timeout);
+        if (stateUpdaterThread != null) {
+            return stateUpdaterThread.restoreConsumerInstanceId(timeout);
+        }
+        return null;
     }
 
     public boolean isRunning() {
