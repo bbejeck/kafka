@@ -27,13 +27,11 @@ import org.apache.kafka.streams.ClientInstanceIds;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
-import org.apache.kafka.streams.internals.ClientInstanceIdsImpl;
 import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.GlobalKTable;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.KTable;
 import org.apache.kafka.streams.kstream.Produced;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,7 +93,7 @@ public final class WordCountDemo {
         props.putIfAbsent(StreamsConfig.consumerPrefix("enable.metrics.push"), true);
         props.putIfAbsent(StreamsConfig.producerPrefix("enable.metrics.push"), true);
         props.putIfAbsent(StreamsConfig.METRICS_RECORDING_LEVEL_CONFIG, "INFO");
-        props.putIfAbsent(StreamsConfig.topicPrefix("retention.ms"), 86400000);
+        props.putIfAbsent(StreamsConfig.topicPrefix("retention.ms"), 3600000);
 
         // setting offset reset to earliest so that we can re-run the demo code with the same pre-loaded data
         // Note: To re-run the demo, you need to use the offset reset tool:
