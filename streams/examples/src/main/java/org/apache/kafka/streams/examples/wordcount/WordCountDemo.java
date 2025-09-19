@@ -32,6 +32,7 @@ import org.apache.kafka.streams.kstream.GlobalKTable;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.KTable;
 import org.apache.kafka.streams.kstream.Produced;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,12 +41,14 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /**
@@ -66,7 +69,6 @@ public final class WordCountDemo {
     public static final String OUTPUT_TOPIC = "output";
     public static final String GLOBAL_TOPIC = "globalV2";
     private static final Logger LOG = LoggerFactory.getLogger(WordCountDemo.class);
-    int messageCount = 100;
 
     static Properties streamsConfig(final String[] args) throws IOException {
         final String path;
@@ -86,13 +88,9 @@ public final class WordCountDemo {
         }
         props.putIfAbsent(StreamsConfig.APPLICATION_ID_CONFIG, "streams-wordcount");
         props.putIfAbsent(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
-        props.putIfAbsent(StreamsConfig.STATESTORE_CACHE_MAX_BYTES_CONFIG, 0);
         props.putIfAbsent(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
         props.putIfAbsent(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
         props.putIfAbsent(StreamsConfig.ENABLE_METRICS_PUSH_CONFIG, true);
-        props.putIfAbsent(StreamsConfig.consumerPrefix("enable.metrics.push"), true);
-        props.putIfAbsent(StreamsConfig.producerPrefix("enable.metrics.push"), true);
-        props.putIfAbsent(StreamsConfig.METRICS_RECORDING_LEVEL_CONFIG, "INFO");
         props.putIfAbsent(StreamsConfig.topicPrefix("retention.ms"), 3600000);
 
         // setting offset reset to earliest so that we can re-run the demo code with the same pre-loaded data
@@ -102,11 +100,16 @@ public final class WordCountDemo {
         return props;
     }
 
-    static void createWordCountStream(final StreamsBuilder builder) {
+    static void createWordCountStream(final StreamsBuilder builder, final AtomicInteger inputCounter, final AtomicInteger outputCounter) {
         final KStream<String, String> source = builder.stream(INPUT_TOPIC);
         final GlobalKTable<String, String> globalTable = builder.globalTable(GLOBAL_TOPIC, Consumed.with(Serdes.String(), Serdes.String()));
 
-        final KTable<String, Long> counts = source.peek((key, value) -> LOG.info("Incoming record word: {}", value))
+        final KTable<String, Long> counts = source.peek((key, value) -> {
+               inputCounter.incrementAndGet();
+               if (inputCounter.get() % 10_000 == 0) {
+                   LOG.info("{} Consumed {} records", new Date(), inputCounter.get());
+               }
+            })
                 .flatMapValues(value -> Arrays.asList(value.toLowerCase(Locale.getDefault()).split("\\W+")))
                 .groupBy((key, value) -> value)
                 .count();
@@ -114,7 +117,12 @@ public final class WordCountDemo {
         // need to override value serde to Long type
         counts.toStream()
                 .leftJoin(globalTable, (k, v) -> k, (v1, v2) -> v1 + 1)
-                .peek((key, value) -> LOG.info("Outgoing records: {} Count: {}", key, value))
+                .peek((key, value) -> {
+                    outputCounter.incrementAndGet();
+                    if (outputCounter.get() % 10_000 == 0) {
+                        LOG.info("{} Processed records: Count: {}", new Date(), outputCounter.get());
+                    }
+                })
                 .to(OUTPUT_TOPIC, Produced.with(Serdes.String(), Serdes.Long()));
     }
 
@@ -191,31 +199,36 @@ public final class WordCountDemo {
             final Thread producer = new Thread(() -> {
                 props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, Serdes.String().serializer().getClass().getName());
                 props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, Serdes.String().serializer().getClass().getName());
-
+                AtomicInteger counter = new AtomicInteger(0);
                 try (KafkaProducer<String, String> kafkaProducer = new KafkaProducer<>(props)) {
 
                     // Publish first 25 single words to global topic
                     kafkaWords.stream()
                             .map(phrase -> phrase.split("\\s+")[0])
-                            .limit(25)
+                            .limit(10_000)
                             .forEach(word -> kafkaProducer.send(new ProducerRecord<>(GLOBAL_TOPIC, word, word),
                                     (metadata, exception) -> {
                                         if (exception != null) {
                                             LOG.error("Error while producing message to global topic {}: {}",
                                                     metadata.topic(), exception.getMessage());
                                         } else {
-                                            LOG.info("Produced message to global topic {} with offset {}",
-                                                    metadata.topic(), metadata.offset());
-                                        }
-                                    }));
-
+                                            counter.incrementAndGet();
+                                            if (counter.get() % 5000 == 0) {
+                                                LOG.info("Produced {} messages to global topic", counter.get());
+                                            }
+                                    }}));
+                    LOG.info("{} Produced {} total messages to global topic", new Date(), counter.get());
+                    counter.set(0);
                     while (true) {
                         kafkaWords.forEach(word -> kafkaProducer.send(new ProducerRecord<>(INPUT_TOPIC, null, word),
                                 (metadata, exception) -> {
                                     if (exception != null) {
                                         LOG.error("Error while producing message to topic {}: {}", metadata.topic(), exception.getMessage());
                                     } else {
-                                        LOG.info("Produced message to topic {} with offset {}", metadata.topic(), metadata.offset());
+                                        counter.incrementAndGet();
+                                        if (counter.get() % 10_000 == 0) {
+                                            LOG.info("{} Produced {} messages to input topic", new Date(), counter.get());
+                                        }
                                     }
                                 }));
                         try {
@@ -230,7 +243,9 @@ public final class WordCountDemo {
             producer.start();
 
             final StreamsBuilder builder = new StreamsBuilder();
-            createWordCountStream(builder);
+            final AtomicInteger counter = new AtomicInteger(0);
+            final AtomicInteger outputCounter = new AtomicInteger(0);
+            createWordCountStream(builder, counter, outputCounter);
             final KafkaStreams streams = new KafkaStreams(builder.build(), props);
             final CountDownLatch latch = new CountDownLatch(1);
 
