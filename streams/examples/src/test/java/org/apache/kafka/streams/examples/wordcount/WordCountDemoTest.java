@@ -39,6 +39,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
@@ -57,7 +58,7 @@ public class WordCountDemoTest {
     public void setup() throws IOException {
         final StreamsBuilder builder = new StreamsBuilder();
         //Create Actual Stream Processing pipeline
-        WordCountDemo.createWordCountStream(builder);
+        WordCountDemo.createWordCountStream(builder, new AtomicInteger(0), new AtomicInteger(0));
         testDriver = new TopologyTestDriver(builder.build(), WordCountDemo.streamsConfig(null));
         inputTopic = testDriver.createInputTopic(WordCountDemo.INPUT_TOPIC, new StringSerializer(), new StringSerializer());
         outputTopic = testDriver.createOutputTopic(WordCountDemo.OUTPUT_TOPIC, new StringDeserializer(), new LongDeserializer());
