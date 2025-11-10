@@ -91,6 +91,7 @@ public final class WordCountDemo {
         props.putIfAbsent(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
         props.putIfAbsent(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
         props.putIfAbsent(StreamsConfig.ENABLE_METRICS_PUSH_CONFIG, true);
+        props.putIfAbsent(StreamsConfig.NUM_STREAM_THREADS_CONFIG, 3);
         props.putIfAbsent(StreamsConfig.topicPrefix("retention.ms"), 3600000);
 
         // setting offset reset to earliest so that we can re-run the demo code with the same pre-loaded data
