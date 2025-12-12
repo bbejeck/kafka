@@ -106,13 +106,13 @@ public class ClientTelemetryUtils {
 
     public static Predicate<? super MetricKeyable> getSelectorFromRequestedMetrics(List<String> requestedMetrics) {
         if (requestedMetrics == null || requestedMetrics.isEmpty()) {
-            log.debug("Telemetry subscription has specified no metric names; telemetry will record no metrics");
+            log.info("Telemetry subscription has specified no metric names; telemetry will record no metrics");
             return SELECTOR_NO_METRICS;
         } else if (requestedMetrics.size() == 1 && requestedMetrics.get(0) != null && requestedMetrics.get(0).equals("*")) {
-            log.debug("Telemetry subscription has specified a single '*' metric name; using all metrics");
+            log.info("Telemetry subscription has specified a single '*' metric name; using all metrics");
             return SELECTOR_ALL_METRICS;
         } else {
-            log.debug("Telemetry subscription has specified to include only metrics that are prefixed with the following strings: {}", requestedMetrics);
+            log.info("Telemetry subscription has specified to include only metrics that are prefixed with the following strings: {}", requestedMetrics);
             return k -> requestedMetrics.stream().anyMatch(f -> k.key().name().startsWith(f));
         }
     }
