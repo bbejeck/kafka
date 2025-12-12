@@ -435,6 +435,7 @@ public class ClientTelemetryReporter implements MetricsReporter {
                 return;
             }
 
+            log.info("Telemetry subscription has specified to include only metrics that are prefixed with the following strings: {}", data.requestedMetrics());
             Uuid clientInstanceId = ClientTelemetryUtils.validateClientInstanceId(data.clientInstanceId());
             int intervalMs = ClientTelemetryUtils.validateIntervalMs(data.pushIntervalMs());
             Predicate<? super MetricKeyable> selector = ClientTelemetryUtils.getSelectorFromRequestedMetrics(
