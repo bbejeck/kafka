@@ -386,8 +386,10 @@ public class ClientTelemetryReporter implements MetricsReporter {
             }
 
             if (localState == ClientTelemetryState.SUBSCRIPTION_NEEDED) {
+                log.info("Creating subscription request for state: {}", localState);
                 return createSubscriptionRequest(localSubscription);
             } else if (localState == ClientTelemetryState.PUSH_NEEDED || localState == ClientTelemetryState.TERMINATING_PUSH_NEEDED) {
+                log.info("Creating push request for state: {}", localState);
                 return createPushRequest(localSubscription);
             }
 
@@ -399,6 +401,10 @@ public class ClientTelemetryReporter implements MetricsReporter {
         public void handleResponse(GetTelemetrySubscriptionsResponse response) {
             final long nowMs = time.milliseconds();
             final GetTelemetrySubscriptionsResponseData data = response.data();
+
+            log.info("Received GetTelemetrySubscriptions response - errorCode: {}, clientInstanceId: {}, subscriptionId: {}, pushIntervalMs: {}, deltaTemporality: {}, requestedMetrics count: {}, acceptedCompressionTypes: {}",
+                data.errorCode(), data.clientInstanceId(), data.subscriptionId(), data.pushIntervalMs(),
+                data.deltaTemporality(), data.requestedMetrics().size(), data.acceptedCompressionTypes());
 
             final ClientTelemetryState oldState;
             final ClientTelemetrySubscription oldSubscription;
@@ -417,6 +423,7 @@ public class ClientTelemetryReporter implements MetricsReporter {
              code then update the interval ms and state so that the subscription can be retried.
             */
             if (errorIntervalMsOpt.isPresent()) {
+                log.info("Received error response with interval: {} ms, transitioning to SUBSCRIPTION_NEEDED", errorIntervalMsOpt.get());
                 /*
                  Update the state from SUBSCRIPTION_INR_PROGRESS to SUBSCRIPTION_NEEDED as the error
                  response indicates that the subscription is not valid.
@@ -455,6 +462,8 @@ public class ClientTelemetryReporter implements MetricsReporter {
                 data.deltaTemporality(),
                 selector);
 
+            log.info("Created new telemetry subscription: {}", clientTelemetrySubscription);
+
             lock.writeLock().lock();
             try {
                 /*
@@ -462,6 +471,7 @@ public class ClientTelemetryReporter implements MetricsReporter {
                  was issued. We're just now getting our callback, but we need to ignore it.
                 */
                 if (isTerminatingState()) {
+                    log.info("Ignoring subscription response as client is in terminating state: {}", state);
                     return;
                 }
 
@@ -471,8 +481,10 @@ public class ClientTelemetryReporter implements MetricsReporter {
                      This is the case where no metrics are requested and/or match the filters. We need
                      to wait intervalMs then retry.
                     */
+                    log.info("No metrics requested/matched, transitioning to SUBSCRIPTION_NEEDED");
                     newState = ClientTelemetryState.SUBSCRIPTION_NEEDED;
                 } else {
+                    log.info("Metrics requested, transitioning to PUSH_NEEDED");
                     newState = ClientTelemetryState.PUSH_NEEDED;
                 }
 
@@ -493,6 +505,8 @@ public class ClientTelemetryReporter implements MetricsReporter {
             final long nowMs = time.milliseconds();
             final PushTelemetryResponseData data = response.data();
 
+            log.info("Received PushTelemetry response - errorCode: {}", data.errorCode());
+
             lock.writeLock().lock();
             try {
                 /*
@@ -500,6 +514,7 @@ public class ClientTelemetryReporter implements MetricsReporter {
                  was issued. Just getting the callback, hence need to ignore it.
                 */
                 if (isTerminatingState()) {
+                    log.info("Ignoring push response as client is in terminating state: {}", state);
                     return;
                 }
 
@@ -511,6 +526,7 @@ public class ClientTelemetryReporter implements MetricsReporter {
                  and the push retried.
                 */
                 if (errorIntervalMsOpt.isPresent()) {
+                    log.info("Received error response with interval: {} ms, transitioning to SUBSCRIPTION_NEEDED", errorIntervalMsOpt.get());
                     if (!maybeSetState(ClientTelemetryState.SUBSCRIPTION_NEEDED)) {
                         log.warn("Unable to transition state after failed push telemetry from state {}", state);
                     }
@@ -518,6 +534,7 @@ public class ClientTelemetryReporter implements MetricsReporter {
                     return;
                 }
 
+                log.info("Push telemetry successful, transitioning to PUSH_NEEDED");
                 lastRequestMs = nowMs;
                 intervalMs = subscription.pushIntervalMs();
                 if (!maybeSetState(ClientTelemetryState.PUSH_NEEDED)) {
@@ -530,13 +547,13 @@ public class ClientTelemetryReporter implements MetricsReporter {
 
         @Override
         public void handleFailedGetTelemetrySubscriptionsRequest(KafkaException maybeFatalException) {
-            log.debug("The broker generated an error for the get telemetry network API request", maybeFatalException);
+            log.info("The broker generated an error for the get telemetry network API request", maybeFatalException);
             handleFailedRequest(maybeFatalException);
         }
 
         @Override
         public void handleFailedPushTelemetryRequest(KafkaException maybeFatalException) {
-            log.debug("The broker generated an error for the push telemetry network API request", maybeFatalException);
+            log.info("The broker generated an error for the push telemetry network API request", maybeFatalException);
             handleFailedRequest(maybeFatalException);
         }
 
@@ -644,15 +661,17 @@ public class ClientTelemetryReporter implements MetricsReporter {
              signal to the broker that we need to have a client instance ID assigned.
             */
             Uuid clientInstanceId = (localSubscription != null) ? localSubscription.clientInstanceId() : Uuid.ZERO_UUID;
-            log.debug("Creating telemetry subscription request with client instance id {}", clientInstanceId);
+            log.info("Creating telemetry subscription request with client instance id: {}", clientInstanceId);
 
             lock.writeLock().lock();
             try {
                 if (isTerminatingState()) {
+                    log.info("Not creating subscription request as client is in terminating state: {}", state);
                     return Optional.empty();
                 }
 
                 if (!maybeSetState(ClientTelemetryState.SUBSCRIPTION_IN_PROGRESS)) {
+                    log.info("Unable to transition to SUBSCRIPTION_IN_PROGRESS from state: {}", state);
                     return Optional.empty();
                 }
             } finally {
@@ -661,6 +680,7 @@ public class ClientTelemetryReporter implements MetricsReporter {
 
             AbstractRequest.Builder<?> requestBuilder = new GetTelemetrySubscriptionsRequest.Builder(
                 new GetTelemetrySubscriptionsRequestData().setClientInstanceId(clientInstanceId), true);
+            log.info("Successfully created GetTelemetrySubscriptions request");
             return Optional.of(requestBuilder);
         }
 
@@ -673,7 +693,8 @@ public class ClientTelemetryReporter implements MetricsReporter {
                 return Optional.empty();
             }
 
-            log.debug("Creating telemetry push request with client instance id {}", localSubscription.clientInstanceId());
+            log.info("Creating telemetry push request with client instance id: {}, subscription id: {}",
+                localSubscription.clientInstanceId(), localSubscription.subscriptionId());
             /*
              Don't send a push request if we don't have the collector initialized. Re-attempt
              the push on the next interval.
@@ -693,6 +714,7 @@ public class ClientTelemetryReporter implements MetricsReporter {
                  should just exit now.
                 */
                 if (state == ClientTelemetryState.TERMINATED || state == ClientTelemetryState.TERMINATING_PUSH_IN_PROGRESS) {
+                    log.info("Not creating push request as client is in state: {}", state);
                     return Optional.empty();
                 }
 
@@ -702,12 +724,14 @@ public class ClientTelemetryReporter implements MetricsReporter {
                 */
                 terminating = state == ClientTelemetryState.TERMINATING_PUSH_NEEDED;
                 if (!maybeSetState(terminating ? ClientTelemetryState.TERMINATING_PUSH_IN_PROGRESS : ClientTelemetryState.PUSH_IN_PROGRESS)) {
+                    log.info("Unable to transition to PUSH_IN_PROGRESS/TERMINATING_PUSH_IN_PROGRESS from state: {}", state);
                     return Optional.empty();
                 }
             } finally {
                 lock.writeLock().unlock();
             }
 
+            log.info("Creating push request, terminating: {}", terminating);
             return createPushRequest(localSubscription, terminating);
         }
 
@@ -741,9 +765,11 @@ public class ClientTelemetryReporter implements MetricsReporter {
             }
 
             CompressionType compressionType = ClientTelemetryUtils.preferredCompressionType(localSubscription.acceptedCompressionTypes(), unsupportedCompressionTypes);
+            log.info("Using compression type: {}", compressionType);
             ByteBuffer compressedPayload;
             try {
                 compressedPayload = ClientTelemetryUtils.compress(payload, compressionType);
+                log.info("Successfully compressed payload with {} compression", compressionType);
             } catch (Throwable e) {
                 // Distinguish between recoverable errors (NoClassDefFoundError for missing compression libs) 
                 // and fatal errors (OutOfMemoryError, etc.) that should terminate telemetry.
@@ -763,6 +789,9 @@ public class ClientTelemetryReporter implements MetricsReporter {
                 compressedPayload = ByteBuffer.wrap(payload.toByteArray());
                 compressionType = CompressionType.NONE;
             }
+
+            log.info("Creating PushTelemetry request - clientInstanceId: {}, subscriptionId: {}, terminating: {}, compressionType: {}, payload size: {} bytes",
+                localSubscription.clientInstanceId(), localSubscription.subscriptionId(), terminating, compressionType, compressedPayload.remaining());
 
             AbstractRequest.Builder<?> requestBuilder = new PushTelemetryRequest.Builder(
                 new PushTelemetryRequestData()
