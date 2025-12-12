@@ -717,27 +717,9 @@ public class ClientTelemetryReporter implements MetricsReporter {
                 emitter.init();
                 kafkaMetricsCollector.collect(emitter);
                 List<String> emittedMetricNames = emitter.emittedMetrics().stream().map(spm -> spm.key().name()).collect(Collectors.toList());
-                System.out.printf("Emitted metrics: %s for subscription %s%n", emittedMetricNames, localSubscription);
+                log.info("Emitted metrics: {} for subscription {}", emittedMetricNames, localSubscription);
                 payload = createPayload(emitter.emittedMetrics());
 
-                // Print client_state and thread_state metrics
-                payload.getResourceMetricsList().stream()
-                    .flatMap(rm -> rm.getScopeMetricsList().stream())
-                    .flatMap(sm -> sm.getMetricsList().stream())
-                    .filter(metric -> "org.apache.kafka.stream.client.state".equals(metric.getName()) || "org.apache.kafka.stream.thread.thread.state".equals(metric.getName()))
-                    .forEach(metric -> {
-                        if (metric.hasGauge()) {
-                            metric.getGauge().getDataPointsList().forEach(dp -> {
-                                String attributes = dp.getAttributesList().stream()
-                                    .map(attr -> attr.getKey() + "=" + attr.getValue().getStringValue())
-                                    .collect(Collectors.joining(", "));
-                                System.out.printf("@@CLIENT|THREAD STATE Metric: %s, Value: %s, Attributes: [%s]%n",
-                                    metric.getName(),
-                                    dp.hasAsInt() ? dp.getAsInt() : dp.getAsDouble(),
-                                    attributes);
-                            });
-                        }
-                    });
 
                 Set<String> keys =  payload.getResourceMetricsList()
                         .stream()
@@ -749,7 +731,7 @@ public class ClientTelemetryReporter implements MetricsReporter {
                         .map(attr -> attr.getKey()+":"+attr.getValue())
                         .collect(Collectors.toSet());
                 if (!keys.isEmpty()) {
-                    System.out.printf("Resource labels %s%n", keys);
+                    log.info("Resource labels {}", keys);
                 }
             } catch (Exception e) {
                 log.warn("Error constructing client telemetry payload: ", e);
