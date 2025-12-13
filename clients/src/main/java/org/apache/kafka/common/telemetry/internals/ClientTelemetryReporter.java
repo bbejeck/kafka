@@ -402,8 +402,8 @@ public class ClientTelemetryReporter implements MetricsReporter {
             final long nowMs = time.milliseconds();
             final GetTelemetrySubscriptionsResponseData data = response.data();
 
-            log.info("Received GetTelemetrySubscriptions response - errorCode: {}, clientInstanceId: {}, subscriptionId: {}, pushIntervalMs: {}, deltaTemporality: {}, requestedMetrics count: {}, acceptedCompressionTypes: {}",
-                data.errorCode(), data.clientInstanceId(), data.subscriptionId(), data.pushIntervalMs(),
+            log.info("Received GetTelemetrySubscriptions response - errorCode: {}, clientInstanceId: {}, subscribedMetrics: {}, subscriptionId: {}, pushIntervalMs: {}, deltaTemporality: {}, requestedMetrics count: {}, acceptedCompressionTypes: {}",
+                data.errorCode(), data.clientInstanceId(), data.requestedMetrics(), data.subscriptionId(), data.pushIntervalMs(),
                 data.deltaTemporality(), data.requestedMetrics().size(), data.acceptedCompressionTypes());
 
             final ClientTelemetryState oldState;
@@ -435,7 +435,6 @@ public class ClientTelemetryReporter implements MetricsReporter {
                 return;
             }
 
-            log.info("Telemetry subscription has specified to include only metrics that are prefixed with the following strings: {}", data.requestedMetrics());
             Uuid clientInstanceId = ClientTelemetryUtils.validateClientInstanceId(data.clientInstanceId());
             int intervalMs = ClientTelemetryUtils.validateIntervalMs(data.pushIntervalMs());
             Predicate<? super MetricKeyable> selector = ClientTelemetryUtils.getSelectorFromRequestedMetrics(
@@ -750,10 +749,10 @@ public class ClientTelemetryReporter implements MetricsReporter {
                         .stream()
                         .flatMap(rm -> rm.getScopeMetricsList().stream())
                         .flatMap(sm -> sm.getMetricsList().stream())
-                        .map( metric-> metric.getGauge())
+                        .map(metric -> metric.getGauge())
                         .flatMap(gauge -> gauge.getDataPointsList().stream())
                         .flatMap(numberDataPoint -> numberDataPoint.getAttributesList().stream())
-                        .map(attr -> attr.getKey()+":"+attr.getValue())
+                        .map(attr -> attr.getKey() + ":" + attr.getValue())
                         .collect(Collectors.toSet());
                 if (!keys.isEmpty()) {
                     log.info("Resource labels {}", keys);
