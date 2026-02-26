@@ -82,6 +82,8 @@ import org.apache.kafka.streams.state.ReadOnlySessionStore;
 import org.apache.kafka.streams.state.ReadOnlyWindowStore;
 import org.apache.kafka.streams.state.SessionStore;
 import org.apache.kafka.streams.state.TimestampedKeyValueStore;
+import org.apache.kafka.streams.state.AggregationWithHeaders;
+import org.apache.kafka.streams.state.SessionStoreWithHeaders;
 import org.apache.kafka.streams.state.TimestampedKeyValueStoreWithHeaders;
 import org.apache.kafka.streams.state.TimestampedWindowStore;
 import org.apache.kafka.streams.state.ValueAndTimestamp;
@@ -965,6 +967,10 @@ public class TopologyTestDriver implements Closeable {
             throw new IllegalArgumentException("Store " + stateStore.name()
                                                    + " is a window store and should be accessed via `getWindowStore()`");
         }
+        if (stateStore instanceof SessionStoreWithHeaders) {
+            throw new IllegalArgumentException("Store " + stateStore.name()
+                                                   + " is a session store with headers and should be accessed via `getSessionStoreWithHeaders()`");
+        }
         if (stateStore instanceof ReadOnlySessionStore) {
             throw new IllegalArgumentException("Store " + stateStore.name()
                                                    + " is a session store and should be accessed via `getSessionStore()`");
@@ -1134,8 +1140,12 @@ public class TopologyTestDriver implements Closeable {
     }
 
     /**
-     * Get the {@link SessionStore} with the given name.
+     * Get the {@link SessionStore} or {@link SessionStoreWithHeaders} with the given name.
      * The store can be a "regular" or global store.
+     * <p>
+     * If the registered store is a {@link SessionStoreWithHeaders} this method will return a value-only query
+     * interface. <strong>It is highly recommended to update the code for this case to avoid bugs and to use
+     * {@link #getSessionStoreWithHeaders(String)} for full store access instead.</strong>
      * <p>
      * This is often useful in test cases to pre-populate the store before the test case instructs the topology to
      * {@link TestInputTopic#pipeInput(TestRecord) process an input message}, and/or to check the store afterward.
@@ -1150,11 +1160,41 @@ public class TopologyTestDriver implements Closeable {
      * @see #getWindowStore(String)
      * @see #getTimestampedWindowStore(String)
      * @see #getTimestampedKeyValueStoreWithHeaders(String)
+     * @see #getSessionStoreWithHeaders(String)
      */
     @SuppressWarnings("unchecked")
     public <K, V> SessionStore<K, V> getSessionStore(final String name) {
         final StateStore store = getStateStore(name, false);
+        if (store instanceof SessionStoreWithHeaders) {
+            log.warn("Method #getSessionStoreWithHeaders() should be used to access a SessionStoreWithHeaders.");
+        }
         return store instanceof SessionStore ? (SessionStore<K, V>) store : null;
+    }
+
+    /**
+     * Get the {@link SessionStoreWithHeaders} with the given name.
+     * The store can be a "regular" or global store.
+     * <p>
+     * This is often useful in test cases to pre-populate the store before the test case instructs the topology to
+     * {@link TestInputTopic#pipeInput(TestRecord) process an input message}, and/or to check the store afterward.
+     *
+     * @param name the name of the store
+     * @return the session store with headers, or {@code null} if no {@link SessionStoreWithHeaders}
+     * has been registered with the given name
+     * @see #getAllStateStores()
+     * @see #getStateStore(String)
+     * @see #getKeyValueStore(String)
+     * @see #getTimestampedKeyValueStore(String)
+     * @see #getVersionedKeyValueStore(String)
+     * @see #getWindowStore(String)
+     * @see #getTimestampedWindowStore(String)
+     * @see #getTimestampedKeyValueStoreWithHeaders(String)
+     * @see #getSessionStore(String)
+     */
+    @SuppressWarnings("unchecked")
+    public <K, AGG> SessionStore<K, AggregationWithHeaders<AGG>> getSessionStoreWithHeaders(final String name) {
+        final StateStore store = getStateStore(name, false);
+        return store instanceof SessionStoreWithHeaders ? (SessionStoreWithHeaders<K, AGG>) store : null;
     }
 
     /**

@@ -915,6 +915,7 @@ public abstract class TopologyTestDriverTest {
         final String windowStoreName = "windowStore";
         final String timestampedWindowStoreName = "windowTimestampStore";
         final String sessionStoreName = "sessionStore";
+        final String sessionStoreWithHeadersName = "sessionStoreWithHeaders";
         final String globalKeyValueStoreName = "globalKeyValueStore";
         final String globalTimestampedKeyValueStoreName = "globalKeyValueTimestampStore";
         final String globalVersionedKeyValueStoreName = "globalKeyValueVersionedStore";
@@ -929,6 +930,7 @@ public abstract class TopologyTestDriverTest {
             windowStoreName,
             timestampedWindowStoreName,
             sessionStoreName,
+            sessionStoreWithHeadersName,
             globalKeyValueStoreName,
             globalTimestampedKeyValueStoreName,
             globalVersionedKeyValueStoreName);
@@ -943,6 +945,7 @@ public abstract class TopologyTestDriverTest {
         assertNull(testDriver.getWindowStore(keyValueStoreName));
         assertNull(testDriver.getTimestampedWindowStore(keyValueStoreName));
         assertNull(testDriver.getSessionStore(keyValueStoreName));
+        assertNull(testDriver.getSessionStoreWithHeaders(keyValueStoreName));
 
         assertNotNull(testDriver.getKeyValueStore(timestampedKeyValueStoreName));
         assertNotNull(testDriver.getTimestampedKeyValueStore(timestampedKeyValueStoreName));
@@ -950,6 +953,7 @@ public abstract class TopologyTestDriverTest {
         assertNull(testDriver.getWindowStore(timestampedKeyValueStoreName));
         assertNull(testDriver.getTimestampedWindowStore(timestampedKeyValueStoreName));
         assertNull(testDriver.getSessionStore(timestampedKeyValueStoreName));
+        assertNull(testDriver.getSessionStoreWithHeaders(timestampedKeyValueStoreName));
 
         if (persistent) { // versioned stores do not offer an in-memory version yet, so nothing to test/verify unless persistent
             assertNull(testDriver.getKeyValueStore(versionedKeyValueStoreName));
@@ -958,6 +962,7 @@ public abstract class TopologyTestDriverTest {
             assertNull(testDriver.getWindowStore(versionedKeyValueStoreName));
             assertNull(testDriver.getTimestampedWindowStore(versionedKeyValueStoreName));
             assertNull(testDriver.getSessionStore(versionedKeyValueStoreName));
+            assertNull(testDriver.getSessionStoreWithHeaders(versionedKeyValueStoreName));
         }
 
         assertNull(testDriver.getKeyValueStore(windowStoreName));
@@ -966,6 +971,7 @@ public abstract class TopologyTestDriverTest {
         assertNotNull(testDriver.getWindowStore(windowStoreName));
         assertNull(testDriver.getTimestampedWindowStore(windowStoreName));
         assertNull(testDriver.getSessionStore(windowStoreName));
+        assertNull(testDriver.getSessionStoreWithHeaders(windowStoreName));
 
         assertNull(testDriver.getKeyValueStore(timestampedWindowStoreName));
         assertNull(testDriver.getTimestampedKeyValueStore(timestampedWindowStoreName));
@@ -973,6 +979,7 @@ public abstract class TopologyTestDriverTest {
         assertNotNull(testDriver.getWindowStore(timestampedWindowStoreName));
         assertNotNull(testDriver.getTimestampedWindowStore(timestampedWindowStoreName));
         assertNull(testDriver.getSessionStore(timestampedWindowStoreName));
+        assertNull(testDriver.getSessionStoreWithHeaders(timestampedWindowStoreName));
 
         assertNull(testDriver.getKeyValueStore(sessionStoreName));
         assertNull(testDriver.getTimestampedKeyValueStore(sessionStoreName));
@@ -980,6 +987,17 @@ public abstract class TopologyTestDriverTest {
         assertNull(testDriver.getWindowStore(sessionStoreName));
         assertNull(testDriver.getTimestampedWindowStore(sessionStoreName));
         assertNotNull(testDriver.getSessionStore(sessionStoreName));
+        assertNull(testDriver.getSessionStoreWithHeaders(sessionStoreName));
+
+        if (persistent) { // session stores with headers only available as persistent
+            assertNull(testDriver.getKeyValueStore(sessionStoreWithHeadersName));
+            assertNull(testDriver.getTimestampedKeyValueStore(sessionStoreWithHeadersName));
+            assertNull(testDriver.getVersionedKeyValueStore(sessionStoreWithHeadersName));
+            assertNull(testDriver.getWindowStore(sessionStoreWithHeadersName));
+            assertNull(testDriver.getTimestampedWindowStore(sessionStoreWithHeadersName));
+            assertNotNull(testDriver.getSessionStore(sessionStoreWithHeadersName));
+            assertNotNull(testDriver.getSessionStoreWithHeaders(sessionStoreWithHeadersName));
+        }
 
         // verify global stores
         assertNotNull(testDriver.getKeyValueStore(globalKeyValueStoreName));
@@ -988,6 +1006,7 @@ public abstract class TopologyTestDriverTest {
         assertNull(testDriver.getWindowStore(globalKeyValueStoreName));
         assertNull(testDriver.getTimestampedWindowStore(globalKeyValueStoreName));
         assertNull(testDriver.getSessionStore(globalKeyValueStoreName));
+        assertNull(testDriver.getSessionStoreWithHeaders(globalKeyValueStoreName));
 
         assertNotNull(testDriver.getKeyValueStore(globalTimestampedKeyValueStoreName));
         assertNotNull(testDriver.getTimestampedKeyValueStore(globalTimestampedKeyValueStoreName));
@@ -995,6 +1014,7 @@ public abstract class TopologyTestDriverTest {
         assertNull(testDriver.getWindowStore(globalTimestampedKeyValueStoreName));
         assertNull(testDriver.getTimestampedWindowStore(globalTimestampedKeyValueStoreName));
         assertNull(testDriver.getSessionStore(globalTimestampedKeyValueStoreName));
+        assertNull(testDriver.getSessionStoreWithHeaders(globalTimestampedKeyValueStoreName));
 
         if (persistent) { // versioned stores do not offer an in-memory version yet, so nothing to test/verify unless persistent
             assertNull(testDriver.getKeyValueStore(globalVersionedKeyValueStoreName));
@@ -1003,6 +1023,7 @@ public abstract class TopologyTestDriverTest {
             assertNull(testDriver.getWindowStore(globalVersionedKeyValueStoreName));
             assertNull(testDriver.getTimestampedWindowStore(globalVersionedKeyValueStoreName));
             assertNull(testDriver.getSessionStore(globalVersionedKeyValueStoreName));
+            assertNull(testDriver.getSessionStoreWithHeaders(globalVersionedKeyValueStoreName));
         }
     }
 
@@ -1023,6 +1044,7 @@ public abstract class TopologyTestDriverTest {
         final String windowStoreName = "windowStore";
         final String timestampedWindowStoreName = "windowTimestampStore";
         final String sessionStoreName = "sessionStore";
+        final String sessionStoreWithHeadersName = "sessionStoreWithHeaders";
         final String globalKeyValueStoreName = "globalKeyValueStore";
         final String globalTimestampedKeyValueStoreName = "globalKeyValueTimestampStore";
         final String globalVersionedKeyValueStoreName = "globalKeyValueVersionedStore";
@@ -1037,6 +1059,7 @@ public abstract class TopologyTestDriverTest {
             windowStoreName,
             timestampedWindowStoreName,
             sessionStoreName,
+            sessionStoreWithHeadersName,
             globalKeyValueStoreName,
             globalTimestampedKeyValueStoreName,
             globalVersionedKeyValueStoreName);
@@ -1098,6 +1121,15 @@ public abstract class TopologyTestDriverTest {
                 equalTo("Store " + sessionStoreName
                     + " is a session store and should be accessed via `getSessionStore()`"));
         }
+        if (persistent) { // session stores with headers only available as persistent
+            final IllegalArgumentException e = assertThrows(
+                IllegalArgumentException.class,
+                () -> testDriver.getStateStore(sessionStoreWithHeadersName));
+            assertThat(
+                e.getMessage(),
+                equalTo("Store " + sessionStoreWithHeadersName
+                    + " is a session store with headers and should be accessed via `getSessionStoreWithHeaders()`"));
+        }
         {
             final IllegalArgumentException e = assertThrows(
                 IllegalArgumentException.class,
@@ -1141,6 +1173,7 @@ public abstract class TopologyTestDriverTest {
                                      final String windowStoreName,
                                      final String timestampedWindowStoreName,
                                      final String sessionStoreName,
+                                     final String sessionStoreWithHeadersName,
                                      final String globalKeyValueStoreName,
                                      final String globalTimestampedKeyValueStoreName,
                                      final String globalVersionedKeyValueStoreName) {
@@ -1202,6 +1235,14 @@ public abstract class TopologyTestDriverTest {
                     Serdes.ByteArray(),
                     Serdes.ByteArray()),
             "processor");
+        if (persistent) { // session stores with headers only available as persistent
+            topology.addStateStore(
+                Stores.sessionStoreBuilderWithHeaders(
+                    Stores.persistentSessionStoreWithHeaders(sessionStoreWithHeadersName, Duration.ofMillis(1000L)),
+                    Serdes.ByteArray(),
+                    Serdes.ByteArray()),
+                "processor");
+        }
         // add global stores
         topology.addGlobalStore(
             persistent ?
