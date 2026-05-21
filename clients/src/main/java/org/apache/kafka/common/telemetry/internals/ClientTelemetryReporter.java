@@ -719,6 +719,7 @@ public class ClientTelemetryReporter implements MetricsReporter {
                 List<String> emittedMetricNames = emitter.emittedMetrics().stream().map(spm -> spm.key().name()).collect(Collectors.toList());
                 log.info("Emitted metrics: {} for subscription {}", emittedMetricNames, localSubscription);
                 payload = createPayload(emitter.emittedMetrics());
+                byte[] numBytes = payload.toByteArray();
 
                 // Print client_state and thread_state metrics
                 payload.getResourceMetricsList().stream()
