@@ -82,8 +82,12 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Verifies KIP-892 transactional state stores survive broker-side errors injected mid-commit, using the
- * {@link KafkaProtocolFaultProxy}. Two shapes, both under {@code exactly_once_v2 + enable.transactional.statestores}:
+ * Verifies KIP-892 transactional state stores — and general EOS recovery — survive broker-side errors and
+ * client failures injected mid-commit, using the {@link KafkaProtocolFaultProxy} (wire faults) and
+ * {@link FaultInjectingClientSupplier} (client-exception faults). All run under {@code exactly_once_v2}; the
+ * recovery scenarios are additionally run as differential probes with {@code enable.transactional.statestores}
+ * both on and off (same exactly-once end state expected either way — a divergence isolates a KIP-892-specific
+ * bug from a general EOS bug):
  *
  * <ol>
  *   <li><b>Deterministic one-shot</b> — inject a single retriable {@code EndTxn} error; assert the app never
@@ -153,15 +157,21 @@ public class TransactionalStoreFaultInjectionIntegrationTest {
     }
 
     private void startCountApp() throws Exception {
-        startCountApp(null);
+        startCountApp(null, true);
+    }
+
+    private void startCountApp(final KafkaClientSupplier supplier) throws Exception {
+        startCountApp(supplier, true);
     }
 
     /**
      * Start the count app. When {@code supplier} is non-null the app is built with it (used to inject
      * client-side producer faults); otherwise the default supplier is used. Either way the app is routed
-     * through the proxy, so wire-level faults can be armed independently.
+     * through the proxy, so wire-level faults can be armed independently. {@code transactionalStores}
+     * toggles {@code enable.transactional.statestores} so the same fault can be run as a differential probe
+     * (KIP-892 rollback+restore vs. the legacy wipe+replay recovery).
      */
-    private void startCountApp(final KafkaClientSupplier supplier) throws Exception {
+    private void startCountApp(final KafkaClientSupplier supplier, final boolean transactionalStores) throws Exception {
         final StreamsBuilder builder = new StreamsBuilder();
         builder.stream(inputTopic, Consumed.with(Serdes.Integer(), Serdes.Integer()))
             .groupByKey(Grouped.with(Serdes.Integer(), Serdes.Integer()))
@@ -175,7 +185,7 @@ public class TransactionalStoreFaultInjectionIntegrationTest {
         props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, proxy.bootstrapServers());
         props.put(StreamsConfig.STATE_DIR_CONFIG, TestUtils.tempDirectory().getPath());
         props.put(StreamsConfig.PROCESSING_GUARANTEE_CONFIG, StreamsConfig.EXACTLY_ONCE_V2);
-        props.put(StreamsConfig.TRANSACTIONAL_STATE_STORES_CONFIG, true);
+        props.put(StreamsConfig.TRANSACTIONAL_STATE_STORES_CONFIG, transactionalStores);
         props.put(StreamsConfig.STATESTORE_CACHE_MAX_BYTES_CONFIG, 0);
         props.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, 100L);
         props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.IntegerSerde.class);
@@ -277,22 +287,28 @@ public class TransactionalStoreFaultInjectionIntegrationTest {
     }
 
     /**
-     * A fatal {@code commitTransaction} failure must corrupt the task, roll back the uncommitted transactional
-     * state-store writes, restore the store from the changelog, and reprocess — landing on exactly-once totals.
+     * A fatal {@code commitTransaction} failure must corrupt the task, discard the uncommitted state-store
+     * writes, restore the store from the changelog, and reprocess — landing on exactly-once totals.
      *
-     * <p>This exercises the KIP-892 recovery path that a retriable-error test can't: a {@code TimeoutException}
-     * from {@code commitTransaction()} under EOSv2 is mapped by Streams to a {@code TaskCorruptedException}
+     * <p>This exercises the recovery path a retriable-error test can't: a {@code TimeoutException} from
+     * {@code commitTransaction()} under EOSv2 is mapped by Streams to a {@code TaskCorruptedException}
      * ({@code TaskExecutor.commitOffsetsOrTransaction}), which aborts the in-flight txn and revives the task
      * from its changelog. We inject that exception with the {@link FaultInjectingClientSupplier} (a client-side
      * fault the wire proxy can't express), then prove: (a) the corruption/restore path was actually taken
      * (TaskManager log), (b) the app returns to {@code RUNNING}, and (c) counts are exactly-once — the second
-     * batch, whose commit was corrupted and rolled back, is reprocessed to the correct total, never doubled.
+     * batch, whose commit was corrupted, is reprocessed to the correct total, never doubled.
+     *
+     * <p><b>Differential probe:</b> run with {@code transactionalStores} on and off. EOS must produce the same
+     * exactly-once end state either way — with it on, recovery is the KIP-892 bounded rollback+restore; with
+     * it off, it is the legacy full wipe+replay. A divergence between the two pinpoints a KIP-892-specific bug;
+     * an identical failure in both points to a general EOS bug.
      */
-    @Test
-    public void shouldRollBackAndRestoreExactlyOnceWhenCommitCorruptsTask() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void shouldRollBackAndRestoreExactlyOnceWhenCommitCorruptsTask(final boolean transactionalStores) throws Exception {
         final FaultInjectingClientSupplier supplier =
             FaultInjectingClientSupplier.wrapping(new DefaultKafkaClientSupplier());
-        startCountApp(supplier);
+        startCountApp(supplier, transactionalStores);
 
         final int numKeys = 5;
 
@@ -340,10 +356,14 @@ public class TransactionalStoreFaultInjectionIntegrationTest {
      * {@code TaskMigratedException}, which {@code StreamThread.handleTaskMigrated} resolves by
      * {@code handleLostAll()} + re-subscribe (rejoin). We assert the app recovers to {@code RUNNING}, the
      * fence/rejoin path was actually taken (log signature), and the counts are exactly-once.
+     *
+     * <p><b>Differential probe:</b> run with {@code transactionalStores} on and off — the fencing/rejoin path
+     * must yield the same exactly-once end state regardless of store transactionality.
      */
-    @Test
-    public void shouldRecoverViaRebalanceWhenProducerFencedAtCommit() throws Exception {
-        startCountApp(); // default supplier; PRODUCER_FENCED is injected on the wire by the proxy
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void shouldRecoverViaRebalanceWhenProducerFencedAtCommit(final boolean transactionalStores) throws Exception {
+        startCountApp(null, transactionalStores); // default supplier; PRODUCER_FENCED injected on the wire by the proxy
         final int numKeys = 5;
 
         // Batch 1: converge to 10 so a real commit persists data + changelog before we fence.
