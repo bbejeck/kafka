@@ -59,6 +59,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
@@ -207,6 +208,12 @@ public class RuntimeChaosIndefiniteSoakIntegrationTest {
         final FaultRule commitGap = proxy.disconnectOn(ApiKeys.END_TXN).withProbability(0.15);
         final FaultRule produceRetry = proxy.injectError(ApiKeys.PRODUCE, Errors.NOT_ENOUGH_REPLICAS)
             .withProbability(0.3);
+        // TXN_OFFSET_COMMIT / ADD_PARTITIONS_TO_TXN aren't in the proxy's injectError ERROR_SETTERS map (only
+        // END_TXN/INIT_PRODUCER_ID/ADD_OFFSETS_TO_TXN/PRODUCE/FETCH are), but disconnectOn has no such
+        // restriction -- it works on any ApiKeys already. These exercise the consumed-offset-commit-within-the-
+        // transaction path and the transactional-write-setup path, neither of which any existing fault touches.
+        final FaultRule txnOffsetCommitGap = proxy.disconnectOn(ApiKeys.TXN_OFFSET_COMMIT).withProbability(0.15);
+        final FaultRule addPartitionsGap = proxy.disconnectOn(ApiKeys.ADD_PARTITIONS_TO_TXN).withProbability(0.15);
         final LogCaptureAppender logs = LogCaptureAppender.createAndRegister();
 
         final long chaosDurationMs = Long.getLong(DURATION_PROPERTY, DEFAULT_CHAOS_DURATION_MS);
@@ -235,9 +242,11 @@ public class RuntimeChaosIndefiniteSoakIntegrationTest {
         logs.close();
 
         final long fired = restoreOor.timesTriggered() + fence.timesTriggered() + epoch.timesTriggered()
-            + commitGap.timesTriggered() + produceRetry.timesTriggered();
+            + commitGap.timesTriggered() + produceRetry.timesTriggered() + txnOffsetCommitGap.timesTriggered()
+            + addPartitionsGap.timesTriggered();
         final long matched = restoreOor.timesMatched() + fence.timesMatched() + epoch.timesMatched()
-            + commitGap.timesMatched() + produceRetry.timesMatched();
+            + commitGap.timesMatched() + produceRetry.timesMatched() + txnOffsetCommitGap.timesMatched()
+            + addPartitionsGap.timesMatched();
         final long total = produced.get();
         // Oracle 2: exactly-once. Poll the store (via IQ) until the summed window counts reach the produced
         // total, or time out. Under exactly-once this converges to EXACTLY total; > total => duplication.
@@ -248,11 +257,13 @@ public class RuntimeChaosIndefiniteSoakIntegrationTest {
         // told apart from "the app just didn't make many matching calls" vs. "calls happened but didn't roll".
         System.out.println("CHAOS-STATS fired=" + fired + " (oor=" + restoreOor.timesTriggered() + " fence="
             + fence.timesTriggered() + " epoch=" + epoch.timesTriggered() + " commitGap="
-            + commitGap.timesTriggered() + " produce=" + produceRetry.timesTriggered() + ") matched=" + matched
-            + " (oor=" + restoreOor.timesMatched() + " fence=" + fence.timesMatched() + " epoch="
-            + epoch.timesMatched() + " commitGap=" + commitGap.timesMatched() + " produce="
-            + produceRetry.timesMatched() + ") churnLogs=" + churnLogs + " movementCycles=" + movementCycles.get()
-            + " produced=" + total + " summed=" + summed);
+            + commitGap.timesTriggered() + " produce=" + produceRetry.timesTriggered() + " txnOffsetCommitGap="
+            + txnOffsetCommitGap.timesTriggered() + " addPartitionsGap=" + addPartitionsGap.timesTriggered()
+            + ") matched=" + matched + " (oor=" + restoreOor.timesMatched() + " fence=" + fence.timesMatched()
+            + " epoch=" + epoch.timesMatched() + " commitGap=" + commitGap.timesMatched() + " produce="
+            + produceRetry.timesMatched() + " txnOffsetCommitGap=" + txnOffsetCommitGap.timesMatched()
+            + " addPartitionsGap=" + addPartitionsGap.timesMatched() + ") churnLogs=" + churnLogs
+            + " movementCycles=" + movementCycles.get() + " produced=" + total + " summed=" + summed);
 
         // Churn sanity: the combined storm must have fired, actually churned lifecycle, AND the movement-cycle
         // mechanism itself ran, else the pass is hollow.
@@ -283,15 +294,17 @@ public class RuntimeChaosIndefiniteSoakIntegrationTest {
         fail("combined runtime chaos surfaced a fatal exception on instance " + which + ":\n" + throwableChain(fatal));
     }
 
-    /** Write every ERROR-level log event (message + full stack trace, if any) captured during the run to a file
-     *  under this module's build dir, so they can be reviewed after the run without combing through gradle's
-     *  full console/report output. Returns the path written to (relative to the module's working directory). */
+    /** Write every ERROR-level log event (timestamp + message + full stack trace, if any) captured during the
+     *  run to a file under this module's build dir, so they can be reviewed -- and correlated by actual elapsed
+     *  time, not line proximity -- after the run without combing through gradle's full console/report output.
+     *  Returns the path written to (relative to the module's working directory). */
     private Path writeErrorLog(final List<LogCaptureAppender.Event> errorEvents) throws Exception {
         final Path path = Paths.get("build", "chaos-error-log", appId + "-errors.log");
         Files.createDirectories(path.getParent());
         final StringBuilder sb = new StringBuilder();
         for (final LogCaptureAppender.Event e : errorEvents) {
-            sb.append("[ERROR] ").append(e.getMessage()).append('\n');
+            sb.append('[').append(Instant.ofEpochMilli(e.getTimestampMillis())).append("] [ERROR] ")
+                .append(e.getMessage()).append('\n');
             e.getThrowableInfo().ifPresent(t -> sb.append(t).append('\n'));
         }
         Files.write(path, sb.toString().getBytes(StandardCharsets.UTF_8));

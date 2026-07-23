@@ -46,12 +46,15 @@ public class LogCaptureAppender extends AbstractAppender implements AutoCloseabl
         private final String message;
         private final Optional<String> throwableInfo;
         private final Optional<String> throwableClassName;
+        private final long timestampMillis;
 
-        Event(final String level, final String message, final Optional<String> throwableInfo, final Optional<String> throwableClassName) {
+        Event(final String level, final String message, final Optional<String> throwableInfo, final Optional<String> throwableClassName,
+              final long timestampMillis) {
             this.level = level;
             this.message = message;
             this.throwableInfo = throwableInfo;
             this.throwableClassName = throwableClassName;
+            this.timestampMillis = timestampMillis;
         }
 
         public String getLevel() {
@@ -68,6 +71,11 @@ public class LogCaptureAppender extends AbstractAppender implements AutoCloseabl
 
         public Optional<String> getThrowableClassName() {
             return throwableClassName;
+        }
+
+        /** Epoch millis this event was logged at ({@link org.apache.logging.log4j.core.LogEvent#getTimeMillis()}). */
+        public long getTimestampMillis() {
+            return timestampMillis;
         }
     }
 
@@ -151,7 +159,8 @@ public class LogCaptureAppender extends AbstractAppender implements AutoCloseabl
                     event.getLevel().toString(),
                     event.getMessage().getFormattedMessage(),
                     throwableString,
-                    throwableClassName));
+                    throwableClassName,
+                    event.getTimeMillis()));
             }
         }
         return result;
