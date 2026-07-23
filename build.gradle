@@ -610,6 +610,10 @@ subprojects {
     maxHeapSize = "2560m"
     jvmArgs = defaultJvmArgs
 
+    // Duration override for long-running/soak-style chaos levers (e.g. RuntimeChaosIndefiniteSoakIntegrationTest);
+    // pass via -Pchaos.indefiniteSoak.duration.ms=<millis> since arbitrary -D system properties on the gradle
+    // command line are not forwarded to the forked test JVM.
+    systemProperty("chaos.indefiniteSoak.duration.ms", project.findProperty("chaos.indefiniteSoak.duration.ms"))
 
     testLogging {
       events = userTestLoggingEvents ?: testLoggingEvents
