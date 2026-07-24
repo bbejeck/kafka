@@ -208,6 +208,15 @@ public class RuntimeChaosIndefiniteSoakIntegrationTest {
         final FaultRule commitGap = proxy.disconnectOn(ApiKeys.END_TXN).withProbability(0.15);
         final FaultRule produceRetry = proxy.injectError(ApiKeys.PRODUCE, Errors.NOT_ENOUGH_REPLICAS)
             .withProbability(0.3);
+        // NEW lever: a fence surfaced when the consumed offsets are committed INTO the transaction. Under
+        // EOS-v2 / transactions V2 (KIP-890) the client skips AddOffsetsToTxn and sends the offsets directly via
+        // TxnOffsetCommit (TransactionManager#sendOffsetsToTransaction), so THIS is the offset-into-txn RPC on
+        // the wire -- the AddOffsetsToTxn lever was structurally inert (never sent in V2). TXN_OFFSET_COMMIT was
+        // only disconnect-able before; it is now in the proxy's injectError ERROR_SETTERS map. PRODUCER_FENCED
+        // here is handled as a TaskMigrated (recoverable), the same class of churn as the END_TXN fences above,
+        // so it should not break the exactly-once oracle -- it just moves the fence onto the offset-commit path.
+        final FaultRule txnOffsetCommitFence = proxy.injectError(ApiKeys.TXN_OFFSET_COMMIT, Errors.PRODUCER_FENCED)
+            .withProbability(0.2);
         // TXN_OFFSET_COMMIT / ADD_PARTITIONS_TO_TXN aren't in the proxy's injectError ERROR_SETTERS map (only
         // END_TXN/INIT_PRODUCER_ID/ADD_OFFSETS_TO_TXN/PRODUCE/FETCH are), but disconnectOn has no such
         // restriction -- it works on any ApiKeys already. These exercise the consumed-offset-commit-within-the-
@@ -243,10 +252,10 @@ public class RuntimeChaosIndefiniteSoakIntegrationTest {
 
         final long fired = restoreOor.timesTriggered() + fence.timesTriggered() + epoch.timesTriggered()
             + commitGap.timesTriggered() + produceRetry.timesTriggered() + txnOffsetCommitGap.timesTriggered()
-            + addPartitionsGap.timesTriggered();
+            + addPartitionsGap.timesTriggered() + txnOffsetCommitFence.timesTriggered();
         final long matched = restoreOor.timesMatched() + fence.timesMatched() + epoch.timesMatched()
             + commitGap.timesMatched() + produceRetry.timesMatched() + txnOffsetCommitGap.timesMatched()
-            + addPartitionsGap.timesMatched();
+            + addPartitionsGap.timesMatched() + txnOffsetCommitFence.timesMatched();
         final long total = produced.get();
         // Oracle 2: exactly-once. Poll the store (via IQ) until the summed window counts reach the produced
         // total, or time out. Under exactly-once this converges to EXACTLY total; > total => duplication.
@@ -259,10 +268,12 @@ public class RuntimeChaosIndefiniteSoakIntegrationTest {
             + fence.timesTriggered() + " epoch=" + epoch.timesTriggered() + " commitGap="
             + commitGap.timesTriggered() + " produce=" + produceRetry.timesTriggered() + " txnOffsetCommitGap="
             + txnOffsetCommitGap.timesTriggered() + " addPartitionsGap=" + addPartitionsGap.timesTriggered()
+            + " txnOffsetCommitFence=" + txnOffsetCommitFence.timesTriggered()
             + ") matched=" + matched + " (oor=" + restoreOor.timesMatched() + " fence=" + fence.timesMatched()
             + " epoch=" + epoch.timesMatched() + " commitGap=" + commitGap.timesMatched() + " produce="
             + produceRetry.timesMatched() + " txnOffsetCommitGap=" + txnOffsetCommitGap.timesMatched()
-            + " addPartitionsGap=" + addPartitionsGap.timesMatched() + ") churnLogs=" + churnLogs
+            + " addPartitionsGap=" + addPartitionsGap.timesMatched()
+            + " txnOffsetCommitFence=" + txnOffsetCommitFence.timesMatched() + ") churnLogs=" + churnLogs
             + " movementCycles=" + movementCycles.get() + " produced=" + total + " summed=" + summed);
 
         // Churn sanity: the combined storm must have fired, actually churned lifecycle, AND the movement-cycle

@@ -455,6 +455,13 @@ public class TaskManager {
 
     private void createNewTasks(final Map<TaskId, Set<TopicPartition>> activeTasksToCreate,
                                 final Map<TaskId, Set<TopicPartition>> standbyTasksToCreate) {
+        // KAFKA-20827 (local port of apache/kafka#22925, not yet merged): a task that failed to initialize is
+        // left owned (registered and flagged failed) for the corruption/failed-task path to reconcile, and the
+        // rectify pass above skips failed tasks -- so without this guard the assignment would build a second
+        // representation here and trip the single-owner invariant in Tasks. Drop when #22925 lands in 4.3.
+        activeTasksToCreate.keySet().removeIf(tasks::containsInitialized);
+        standbyTasksToCreate.keySet().removeIf(tasks::containsInitialized);
+
         final Collection<StreamTask> newActiveTasks = activeTaskCreator.createTasks(mainConsumer, activeTasksToCreate);
         final Collection<StandbyTask> newStandbyTasks = standbyTaskCreator.createTasks(standbyTasksToCreate);
 

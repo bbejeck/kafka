@@ -19,6 +19,7 @@ package org.apache.kafka.streams.integration.utils;
 import org.apache.kafka.common.message.FetchResponseData;
 import org.apache.kafka.common.message.ProduceResponseData;
 import org.apache.kafka.common.message.ResponseHeaderData;
+import org.apache.kafka.common.message.TxnOffsetCommitResponseData;
 import org.apache.kafka.common.protocol.ApiKeys;
 import org.apache.kafka.common.protocol.Errors;
 import org.apache.kafka.common.requests.AbstractResponse;
@@ -30,6 +31,7 @@ import org.apache.kafka.common.requests.InitProducerIdResponse;
 import org.apache.kafka.common.requests.MetadataResponse;
 import org.apache.kafka.common.requests.RequestHeader;
 import org.apache.kafka.common.requests.RequestUtils;
+import org.apache.kafka.common.requests.TxnOffsetCommitResponse;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,6 +96,15 @@ public final class KafkaProtocolFaultProxy implements AutoCloseable {
         ERROR_SETTERS.put(ApiKeys.END_TXN, (r, e) -> ((EndTxnResponse) r).data().setErrorCode(e.code()));
         ERROR_SETTERS.put(ApiKeys.INIT_PRODUCER_ID, (r, e) -> ((InitProducerIdResponse) r).data().setErrorCode(e.code()));
         ERROR_SETTERS.put(ApiKeys.ADD_OFFSETS_TO_TXN, (r, e) -> ((AddOffsetsToTxnResponse) r).data().setErrorCode(e.code()));
+        // TxnOffsetCommit carries the consumed offsets into the transaction. Under EOS-v2 / transactions V2
+        // (KIP-890) the client sends this directly (AddOffsetsToTxn is skipped -- see TransactionManager
+        // #sendOffsetsToTransaction), so this is THE offset-commit-into-txn RPC to fault for KIP-1035. The
+        // response carries per-partition error codes, so stamp every partition of every topic.
+        ERROR_SETTERS.put(ApiKeys.TXN_OFFSET_COMMIT, (r, e) -> {
+            final TxnOffsetCommitResponseData data = ((TxnOffsetCommitResponse) r).data();
+            data.topics().forEach(topic ->
+                topic.partitions().forEach(p -> p.setErrorCode(e.code())));
+        });
         ERROR_SETTERS.put(ApiKeys.PRODUCE, (r, e) -> {
             final ProduceResponseData data = ((org.apache.kafka.common.requests.ProduceResponse) r).data();
             data.responses().forEach(topic ->
