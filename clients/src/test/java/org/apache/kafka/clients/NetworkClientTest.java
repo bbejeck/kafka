@@ -1356,6 +1356,129 @@ public class NetworkClientTest {
         verify(mockClientTelemetrySender, times(2)).createRequest();
     }
 
+    /**
+     * Repro for INC-12544 ("active connections increase post upgrade to 3.9.2").
+     *
+     * <p>Nikit's hypothesis: KIP-714's {@code TelemetrySender} picks a node, caches it as the
+     * sticky node, and reuses it for as long as the connection stays usable. During client
+     * startup the only node available is the bootstrap node, which carries a synthetic negative
+     * node id (see {@link org.apache.kafka.common.Cluster#bootstrap}) and is a connection distinct
+     * from any real broker. If telemetry latches onto that bootstrap connection, this 3.9.2 code
+     * never re-validates the sticky node against fresh metadata, so telemetry keeps pushing over
+     * the bootstrap connection every interval. That traffic resets the connection's idle timer, so
+     * {@code connections.max.idle.ms} never reaps it and the client permanently holds one extra
+     * connection (bootstrap + N real brokers).
+     *
+     * <p>This is exactly the case fixed by KAFKA-20393 (4.2.1+), which added an
+     * {@code isNodeChanged()} check at the top of {@code maybeUpdate} that clears the sticky node
+     * once it is no longer present in (or differs from) current metadata. On a 4.2.1+ client the
+     * final assertion below flips: telemetry would abandon the bootstrap node and re-pick a real
+     * broker, and the bootstrap connection would then idle out.
+     */
+    @Test
+    public void testTelemetryStaysPinnedToBootstrapConnectionAfterMetadataRefresh() {
+        // Cluster.bootstrap assigns bootstrap nodes descending negative ids starting at -1.
+        Node bootstrapNode = new Node(-1, "localhost", 9092);
+        Node realNode = this.node; // id 0
+
+        TestMetadataUpdater metadataUpdater = new TestMetadataUpdater(Collections.singletonList(bootstrapNode));
+
+        ClientTelemetrySender mockClientTelemetrySender = mock(ClientTelemetrySender.class);
+        when(mockClientTelemetrySender.timeToNextUpdate(anyLong())).thenReturn(0L);
+        when(mockClientTelemetrySender.createRequest()).thenReturn(Optional.of(
+            new GetTelemetrySubscriptionsRequest.Builder(new GetTelemetrySubscriptionsRequestData(), true)));
+
+        NetworkClient client = new NetworkClient(metadataUpdater, null, selector, "mock", Integer.MAX_VALUE,
+            reconnectBackoffMsTest, reconnectBackoffMaxMsTest, 64 * 1024, 64 * 1024,
+            defaultRequestTimeoutMs, connectionSetupTimeoutMsTest, connectionSetupTimeoutMaxMsTest,
+            time, false, new ApiVersions(), null, new LogContext(), new DefaultHostResolver(), mockClientTelemetrySender,
+            MetadataRecoveryStrategy.NONE);
+
+        // Startup: the only node known is the bootstrap node, so telemetry latches onto it and
+        // sends its first GetTelemetrySubscriptions request over the bootstrap connection.
+        awaitReady(client, bootstrapNode);
+        client.poll(0, time.milliseconds());
+        assertEquals(bootstrapNode, client.telemetryConnectedNode(),
+            "TelemetrySender should have latched its sticky node onto the bootstrap connection");
+
+        // Real metadata arrives and replaces the bootstrap node with the actual broker(s).
+        // The bootstrap node (id -1) is no longer part of the cluster.
+        metadataUpdater.setNodes(Collections.singletonList(realNode));
+        assertFalse(metadataUpdater.fetchNodes().contains(bootstrapNode),
+            "bootstrap node should be gone from metadata after the refresh");
+
+        // Drive several more telemetry intervals. The bootstrap connection is still usable
+        // (canSendRequest stays true), and on 3.9.2 the sticky node is never revalidated against
+        // the refreshed metadata, so telemetry keeps riding the bootstrap connection every interval.
+        for (int i = 0; i < 5; i++) {
+            client.poll(0, time.milliseconds());
+            assertEquals(bootstrapNode, client.telemetryConnectedNode(),
+                "telemetry should keep riding the bootstrap connection each interval");
+        }
+
+        // BUG: telemetry is still pinned to the phantom bootstrap node instead of the real broker.
+        // In production this connection keeps being written to every telemetry interval, so its
+        // idle timer never fires and the client permanently holds it as an extra connection
+        // (bootstrap + N real brokers). The mock selector cannot model idle-reaping, so this test
+        // asserts the precise defect -- the never-revalidated sticky node -- which is what causes it.
+        // On a 4.2.1+ client, KAFKA-20393's isNodeChanged() check would clear the sticky node here
+        // (id -1 is absent from the refreshed metadata) and re-point telemetry at realNode.
+        assertEquals(bootstrapNode, client.telemetryConnectedNode(),
+            "3.9.2 keeps telemetry pinned to the stale bootstrap connection (fixed by KAFKA-20393)");
+        assertTrue(client.isReady(bootstrapNode, time.milliseconds()),
+            "bootstrap connection is still held rather than released");
+    }
+
+    /**
+     * Companion to {@link #testTelemetryStaysPinnedToBootstrapConnectionAfterMetadataRefresh()},
+     * reproducing Nikit's explanation for the eventual connection *drop*: once the pinned bootstrap
+     * connection is finally closed (e.g. the broker reaps it, or a network blip), the sticky node is
+     * cleared and telemetry re-picks one of the real brokers, so the client falls back to its
+     * expected connection count.
+     */
+    @Test
+    public void testTelemetryReleasesBootstrapConnectionOnceItDrops() {
+        Node bootstrapNode = new Node(-1, "localhost", 9092);
+        Node realNode = this.node; // id 0
+
+        TestMetadataUpdater metadataUpdater = new TestMetadataUpdater(Collections.singletonList(bootstrapNode));
+
+        ClientTelemetrySender mockClientTelemetrySender = mock(ClientTelemetrySender.class);
+        when(mockClientTelemetrySender.timeToNextUpdate(anyLong())).thenReturn(0L);
+        when(mockClientTelemetrySender.createRequest()).thenReturn(Optional.of(
+            new GetTelemetrySubscriptionsRequest.Builder(new GetTelemetrySubscriptionsRequestData(), true)));
+
+        NetworkClient client = new NetworkClient(metadataUpdater, null, selector, "mock", Integer.MAX_VALUE,
+            reconnectBackoffMsTest, reconnectBackoffMaxMsTest, 64 * 1024, 64 * 1024,
+            defaultRequestTimeoutMs, connectionSetupTimeoutMsTest, connectionSetupTimeoutMaxMsTest,
+            time, false, new ApiVersions(), null, new LogContext(), new DefaultHostResolver(), mockClientTelemetrySender,
+            MetadataRecoveryStrategy.NONE);
+
+        // Pin telemetry onto the bootstrap connection, then let real metadata arrive.
+        awaitReady(client, bootstrapNode);
+        client.poll(0, time.milliseconds());
+        assertEquals(bootstrapNode, client.telemetryConnectedNode());
+        metadataUpdater.setNodes(Collections.singletonList(realNode));
+
+        // Meanwhile the client also opens a normal connection to the real broker; telemetry stays
+        // stubbornly on the bootstrap connection (the extra connection).
+        awaitReady(client, realNode);
+        client.poll(0, time.milliseconds());
+        assertEquals(bootstrapNode, client.telemetryConnectedNode(),
+            "telemetry should still be riding the bootstrap connection while it is alive");
+
+        // The bootstrap connection is finally closed by the broker.
+        selector.serverDisconnect(bootstrapNode.idString());
+        client.poll(0, time.milliseconds());
+        assertNull(client.telemetryConnectedNode(),
+            "sticky node should be cleared once the bootstrap connection can no longer send");
+
+        // Next telemetry interval: telemetry re-picks a real broker from current metadata.
+        client.poll(0, time.milliseconds());
+        assertEquals(realNode, client.telemetryConnectedNode(),
+            "telemetry should fall back to a real broker after the bootstrap connection drops");
+    }
+
     private RequestHeader parseHeader(ByteBuffer buffer) {
         buffer.getInt(); // skip size
         return RequestHeader.parse(buffer.slice());
