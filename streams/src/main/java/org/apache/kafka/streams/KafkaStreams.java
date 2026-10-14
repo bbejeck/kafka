@@ -2141,7 +2141,7 @@ public class KafkaStreams implements AutoCloseable {
             // could be `null` if telemetry is disabled on the client itself
             if (instanceId != null) {
                 clientInstanceIds.addConsumerInstanceId(
-                    globalStreamThread.getName() + "-global-consumer",
+                    ClientUtils.globalConsumerClientId(clientId),
                     instanceId
                 );
             } else {

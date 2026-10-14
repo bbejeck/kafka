@@ -400,7 +400,14 @@ public class StreamThread extends Thread implements ProcessingThread {
     private volatile KafkaFutureImpl<Uuid> restoreConsumerInstanceIdFuture = new KafkaFutureImpl<>();
     private volatile KafkaFutureImpl<Uuid> producerInstanceIdFuture = new KafkaFutureImpl<>();
 
+    // the restore consumer is owned by the state updater, so its client id is derived from the state updater id
+    private final String restoreConsumerClientId;
+
     private Timer topicsReadyTimer;
+
+    private static String stateUpdaterId(final String threadId) {
+        return threadId.replace(THREAD_ID_SUBSTRING, STATE_UPDATER_ID_SUBSTRING);
+    }
 
     public static StreamThread create(final TopologyMetadata topologyMetadata,
                                       final StreamsConfig config,
@@ -421,7 +428,7 @@ public class StreamThread extends Thread implements ProcessingThread {
                                       final BiConsumer<Throwable, Boolean> streamsUncaughtExceptionHandler) {
 
         final String threadId = clientId + THREAD_ID_SUBSTRING + threadIdx;
-        final String stateUpdaterId = threadId.replace(THREAD_ID_SUBSTRING, STATE_UPDATER_ID_SUBSTRING);
+        final String stateUpdaterId = stateUpdaterId(threadId);
 
         final String logPrefix = String.format("stream-thread [%s] ", threadId);
         final LogContext logContext = new LogContext(logPrefix);
@@ -854,6 +861,7 @@ public class StreamThread extends Thread implements ProcessingThread {
         this.cacheResizer = cacheResizer;
         this.metricsConfig = streamsMetrics.metricsRegistry().config();
         this.metricsReporter = metricsReporter;
+        this.restoreConsumerClientId = restoreConsumerClientId(stateUpdaterId(threadId));
 
         // The following sensors are created here but their references are not stored in this object, since within
         // this object they are not recorded. The sensors are created here so that the stream threads starts with all
@@ -2046,7 +2054,7 @@ public class StreamThread extends Thread implements ProcessingThread {
             getName(),
             state().name(),
             consumerClientId(getName()),
-            restoreConsumerClientId(getName()),
+            restoreConsumerClientId,
             taskManager.producerClientIds(),
             adminClientId,
             Set.of(),
@@ -2083,7 +2091,7 @@ public class StreamThread extends Thread implements ProcessingThread {
             getName(),
             state().name(),
             consumerClientId(getName()),
-            restoreConsumerClientId(getName()),
+            restoreConsumerClientId,
             taskManager.producerClientIds(),
             adminClientId,
             activeTasksMetadata,
@@ -2169,7 +2177,7 @@ public class StreamThread extends Thread implements ProcessingThread {
 
         restoreConsumerInstanceIdFuture = stateUpdater.restoreConsumerInstanceId(timeout);
 
-        result.put(getName() + "-restore-consumer", restoreConsumerInstanceIdFuture);
+        result.put(restoreConsumerClientId, restoreConsumerInstanceIdFuture);
 
         if (producerInstanceIdFuture.isDone()) {
             if (producerInstanceIdFuture.isCompletedExceptionally()) {

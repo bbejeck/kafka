@@ -19,6 +19,7 @@ package org.apache.kafka.streams;
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.ListOffsetsResult.ListOffsetsResultInfo;
 import org.apache.kafka.clients.admin.MockAdminClient;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.MockProducer;
 import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.KafkaFuture;
@@ -1976,6 +1977,32 @@ public class KafkaStreamsTest {
             );
             assertEquals("Could not retrieve consumer/producer instance id for some-client.", timeoutException.getMessage());
             assertInstanceOf(java.util.concurrent.TimeoutException.class, timeoutException.getCause());
+        }
+    }
+
+    @Test
+    public void shouldReturnGlobalConsumerInstanceIdKeyedByGlobalConsumerClientId() {
+        prepareStreams();
+        prepareStreamThread(streamThreadOne, 1);
+        prepareStreamThread(streamThreadTwo, 2);
+        adminClient.setClientInstanceId(Uuid.randomUuid());
+        final Uuid globalConsumerInstanceId = Uuid.randomUuid();
+        final KafkaFutureImpl<Uuid> globalConsumerFuture = new KafkaFutureImpl<>();
+        globalConsumerFuture.complete(globalConsumerInstanceId);
+
+        final StreamsBuilder builder = getBuilderWithSource();
+        builder.globalTable("anyTopic");
+        try (final KafkaStreams streams = new KafkaStreams(builder.build(), props, supplier, time)) {
+            streams.start();
+
+            when(globalStreamThreadMockedConstruction.constructed().get(0).globalConsumerInstanceId(any()))
+                .thenReturn(globalConsumerFuture);
+
+            final String globalConsumerClientId = (String) supplier.globalConsumerConfig.get(ConsumerConfig.CLIENT_ID_CONFIG);
+            assertEquals(CLIENT_ID + "-global-consumer", globalConsumerClientId);
+
+            final Map<String, Uuid> consumerInstanceIds = streams.clientInstanceIds(Duration.ZERO).consumerInstanceIds();
+            assertEquals(Map.of(globalConsumerClientId, globalConsumerInstanceId), consumerInstanceIds);
         }
     }
 

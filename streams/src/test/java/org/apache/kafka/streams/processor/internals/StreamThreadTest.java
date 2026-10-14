@@ -19,6 +19,7 @@ package org.apache.kafka.streams.processor.internals;
 import org.apache.kafka.clients.admin.MockAdminClient;
 import org.apache.kafka.clients.consumer.CloseOptions.GroupMembershipOperation;
 import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerGroupMetadata;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -2357,7 +2358,8 @@ public class StreamThreadTest {
         final String threadName = metadata.threadName();
         assertTrue(threadName.startsWith(CLIENT_ID + "-StreamThread-" + threadIdx));
         assertEquals(threadName + "-consumer", metadata.consumerClientId());
-        assertEquals(threadName + "-restore-consumer", metadata.restoreConsumerClientId());
+        assertEquals(CLIENT_ID + "-StateUpdater-" + threadIdx + "-restore-consumer", metadata.restoreConsumerClientId());
+        assertEquals(clientSupplier.restoreConsumerConfig.get(ConsumerConfig.CLIENT_ID_CONFIG), metadata.restoreConsumerClientId());
         assertEquals(Collections.singleton(threadName + "-producer"), metadata.producerClientIds());
         assertEquals(CLIENT_ID + "-admin", metadata.adminClientId());
     }
@@ -3674,7 +3676,7 @@ public class StreamThreadTest {
         final Uuid mainConsumerUuid = mainConsumerFuture.get();
         assertEquals(consumerInstanceId, mainConsumerUuid);
 
-        final KafkaFuture<Uuid> restoreConsumerFuture = clientInstanceIdFutures.get("clientId-StreamThread-1-restore-consumer");
+        final KafkaFuture<Uuid> restoreConsumerFuture = clientInstanceIdFutures.get("clientId-StateUpdater-1-restore-consumer");
         final Uuid restoreConsumerUuid = restoreConsumerFuture.get();
         assertEquals(restoreInstanceId, restoreConsumerUuid);
 
@@ -3711,7 +3713,7 @@ public class StreamThreadTest {
 
         thread.maybeGetClientInstanceIds();
 
-        final KafkaFuture<Uuid> future = consumerFutures.get("clientId-StreamThread-1-restore-consumer");
+        final KafkaFuture<Uuid> future = consumerFutures.get("clientId-StateUpdater-1-restore-consumer");
         final ExecutionException error = assertThrows(ExecutionException.class, future::get);
         assertInstanceOf(UnsupportedOperationException.class, error.getCause());
         assertEquals("clientInstanceId not set", error.getCause().getMessage());
@@ -3764,7 +3766,7 @@ public class StreamThreadTest {
 
         thread.maybeGetClientInstanceIds();
 
-        final KafkaFuture<Uuid> future = consumerFutures.get("clientId-StreamThread-1-restore-consumer");
+        final KafkaFuture<Uuid> future = consumerFutures.get("clientId-StateUpdater-1-restore-consumer");
         final Uuid clientInstanceId = future.get();
         assertNull(clientInstanceId);
     }
@@ -3826,7 +3828,7 @@ public class StreamThreadTest {
 
         thread.maybeGetClientInstanceIds();
 
-        final KafkaFuture<Uuid> future = consumerFutures.get("clientId-StreamThread-1-restore-consumer");
+        final KafkaFuture<Uuid> future = consumerFutures.get("clientId-StateUpdater-1-restore-consumer");
 
         final ExecutionException error = assertThrows(ExecutionException.class, future::get);
         assertInstanceOf(TimeoutException.class, error.getCause());

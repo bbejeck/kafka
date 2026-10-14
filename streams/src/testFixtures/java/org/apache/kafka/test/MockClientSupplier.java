@@ -47,6 +47,8 @@ public class MockClientSupplier implements KafkaClientSupplier {
     public final List<MockProducer<byte[], byte[]>> producers = new LinkedList<>();
     public final MockConsumer<byte[], byte[]> consumer = new MockConsumer<>(AutoOffsetResetStrategy.EARLIEST.name());
     public final MockConsumer<byte[], byte[]> restoreConsumer = new MockConsumer<>(AutoOffsetResetStrategy.LATEST.name());
+    public Map<String, Object> restoreConsumerConfig;
+    public Map<String, Object> globalConsumerConfig;
 
     public void setApplicationIdForProducer(final String applicationId) {
         this.applicationId = applicationId;
@@ -94,11 +96,13 @@ public class MockClientSupplier implements KafkaClientSupplier {
 
     @Override
     public Consumer<byte[], byte[]> getRestoreConsumer(final Map<String, Object> config) {
+        restoreConsumerConfig = config;
         return restoreConsumer;
     }
 
     @Override
     public Consumer<byte[], byte[]> getGlobalConsumer(final Map<String, Object> config) {
+        globalConsumerConfig = config;
         return restoreConsumer;
     }
 }

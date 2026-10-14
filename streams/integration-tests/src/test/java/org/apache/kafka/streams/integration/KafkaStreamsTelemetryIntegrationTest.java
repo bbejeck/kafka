@@ -183,7 +183,7 @@ public class KafkaStreamsTelemetryIntegrationTest {
             final ClientInstanceIds clientInstanceIds = streams.clientInstanceIds(Duration.ofSeconds(60));
             for (final Map.Entry<String, Uuid> instanceId : clientInstanceIds.consumerInstanceIds().entrySet()) {
                 final String instanceIdKey = instanceId.getKey();
-                if (instanceIdKey.endsWith("GlobalStreamThread-global-consumer")) {
+                if (instanceIdKey.endsWith("-global-consumer")) {
                     globalStoreConsumerInstanceId = instanceId.getValue();
                 }
             }
@@ -224,7 +224,7 @@ public class KafkaStreamsTelemetryIntegrationTest {
 
             final Uuid mainConsumerInstanceId = clientInstanceIds.consumerInstanceIds().entrySet().stream()
                     .filter(entry -> !entry.getKey().endsWith("-restore-consumer")
-                            && !entry.getKey().endsWith("GlobalStreamThread-global-consumer"))
+                            && !entry.getKey().endsWith("-global-consumer"))
                     .map(Map.Entry::getValue)
                     .findFirst().orElseThrow();
             assertNotNull(adminInstanceId);

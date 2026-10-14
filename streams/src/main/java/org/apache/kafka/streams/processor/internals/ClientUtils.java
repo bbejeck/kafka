@@ -75,6 +75,10 @@ public class ClientUtils {
         return threadClientId + "-restore-consumer";
     }
 
+    public static String globalConsumerClientId(final String clientId) {
+        return clientId + "-global-consumer";
+    }
+
     public static String producerClientId(final String threadClientId) {
         return threadClientId + "-producer";
     }

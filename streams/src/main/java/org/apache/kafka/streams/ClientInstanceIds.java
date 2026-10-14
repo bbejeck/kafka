@@ -41,7 +41,7 @@ public interface ClientInstanceIds {
     /**
      * Returns the {@code client instance id} of the consumers.
      *
-     * @return a map from thread key to {@code client instance id}
+     * @return a map from {@code client.id} to {@code client instance id}
      */
     @SuppressWarnings("unused")
     Map<String, Uuid> consumerInstanceIds();
@@ -49,7 +49,7 @@ public interface ClientInstanceIds {
     /**
      * Returns the {@code client instance id} of the producers.
      *
-     * @return a map from thread key to {@code client instance id}
+     * @return a map from {@code client.id} to {@code client instance id}
      */
     @SuppressWarnings("unused")
     Map<String, Uuid> producerInstanceIds();

@@ -2112,7 +2112,7 @@ Restore consumer
 </td>  
  <td>
 
-`<client.id>-StreamThread-<threadIdx>-restore-consumer`
+`<client.id>-StateUpdater-<threadIdx>-restore-consumer`
 </td> </tr>  
  <tr>  
  <td>

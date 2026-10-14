@@ -55,6 +55,7 @@ import org.apache.kafka.streams.kstream.TimeWindowedSerializer;
 import org.apache.kafka.streams.processor.FailOnInvalidTimestamp;
 import org.apache.kafka.streams.processor.TimestampExtractor;
 import org.apache.kafka.streams.processor.assignment.TaskAssignor;
+import org.apache.kafka.streams.processor.internals.ClientUtils;
 import org.apache.kafka.streams.processor.internals.DefaultKafkaClientSupplier;
 import org.apache.kafka.streams.processor.internals.NoOpProcessorWrapper;
 import org.apache.kafka.streams.processor.internals.StreamsPartitionAssignor;
@@ -484,8 +485,10 @@ public class StreamsConfig extends AbstractConfig {
     /** {@code client.id} */
     @SuppressWarnings("WeakerAccess")
     public static final String CLIENT_ID_CONFIG = CommonClientConfigs.CLIENT_ID_CONFIG;
-    private static final String CLIENT_ID_DOC = "An ID prefix string used for the client IDs of internal (main, restore, and global) consumers , producers, and admin clients" +
-        " with pattern <code>&lt;client.id&gt;-[Global]StreamThread[-&lt;threadSequenceNumber&gt;]-&lt;consumer|producer|restore-consumer|global-consumer&gt;</code>.";
+    private static final String CLIENT_ID_DOC = "An ID prefix string used for the client IDs of internal (main, restore, and global) consumers, producers, and admin clients" +
+        " with pattern <code>&lt;client.id&gt;-StreamThread-&lt;threadSequenceNumber&gt;-&lt;consumer|producer&gt;</code> for the main consumer and producer," +
+        " <code>&lt;client.id&gt;-StateUpdater-&lt;threadSequenceNumber&gt;-restore-consumer</code> for the restore consumer," +
+        " <code>&lt;client.id&gt;-global-consumer</code> for the global consumer, and <code>&lt;client.id&gt;-admin</code> for the admin client.";
 
     /** {@code commit.interval.ms} */
     @SuppressWarnings("WeakerAccess")
@@ -2058,7 +2061,7 @@ public class StreamsConfig extends AbstractConfig {
         baseConsumerProps.remove(ConsumerConfig.GROUP_INSTANCE_ID_CONFIG);
 
         // add client id with stream client id prefix
-        baseConsumerProps.put(CommonClientConfigs.CLIENT_ID_CONFIG, clientId + "-global-consumer");
+        baseConsumerProps.put(CommonClientConfigs.CLIENT_ID_CONFIG, ClientUtils.globalConsumerClientId(clientId));
         baseConsumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "none");
 
         return baseConsumerProps;
